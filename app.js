@@ -6,7 +6,7 @@ const expressLayouts = require('express-ejs-layouts');
 const { initializeDatabase } = require('./db');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = 8080;
 
 initializeDatabase();
 
