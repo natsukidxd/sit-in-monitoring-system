@@ -1,0 +1,162 @@
+<section class="register-section">
+  <div class="container py-4 py-lg-5">
+    <div class="register-card mx-auto">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-6">
+          <h1 class="fw-bold mb-4 text-center">Sign up</h1>
+          <form action="/auth/register" method="POST" class="row g-3">
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="id_number"
+                  id="id_number"
+                  placeholder=""
+                  required
+                />
+                <label for="id_number">ID Number</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="last_name"
+                  id="last_name"
+                  placeholder=""
+                  required
+                />
+                <label for="last_name">Last Name</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="first_name"
+                  id="first_name"
+                  placeholder=""
+                  required
+                />
+                <label for="first_name">First Name</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="middle_name"
+                  id="middle_name"
+                  placeholder=""
+                  required
+                />
+                <label for="middle_name">Middle Name</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="address"
+                  id="address"
+                  placeholder=""
+                />
+                <label for="address">Address</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <select name="course" id="course" class="form-select" required>
+                  <option value="" selected hidden disabled></option>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSCS-AI">BSCS-AI</option>
+                </select>
+                <label for="course">Course</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <select
+                  name="course_level"
+                  id="course_level"
+                  class="form-select"
+                  required
+                >
+                  <option value="" selected hidden disabled></option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+                <label for="course_level">Course Level</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="email"
+                  class="form-control"
+                  name="email"
+                  id="email"
+                  placeholder=""
+                />
+                <label for="email">Email</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="password"
+                  class="form-control"
+                  name="password"
+                  id="password"
+                  placeholder=""
+                  required
+                />
+                <label for="password">Password</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="password"
+                  class="form-control"
+                  name="confirm_password"
+                  id="confirm_password"
+                  placeholder=""
+                />
+                <label for="confirm_password">Confirm Password</label>
+              </div>
+            </div>
+            <div class="col-12 text-center text-lg">
+              <button class="btn btn-primary w-50 py-2 mb-4" type="submit">
+                Register
+              </button>
+              <p class="text-center mb-0">
+              Already have an account?
+              <a href="/auth/login" class="text-danger text-decoration-none fw-semibold"
+                >Login</a
+              >
+            </p>
+            </div>
+          </form>
+        </div>
+        <div class="col-lg-6 d-flex flex-column justify-content-center align-items-center">
+          <img 
+            src="/images/student-with-backpack.png"
+            class="img-fluid register-img mb-4"
+            alt="Register Illustration"
+            style="transform: scaleX(-1)"
+          />
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
