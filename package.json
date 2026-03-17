@@ -2,10 +2,10 @@
   "name": "sit-in-monitoring-system",
   "version": "1.0.0",
   "description": "Express + Bootstrap + SQLite Sit-in Monitoring System",
-  "main": "server.js",
+  "main": "app.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node app.js",
+    "dev": "node app.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
