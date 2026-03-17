@@ -23,6 +23,7 @@
           <li class="nav-item"><a class="nav-link <%= path === '/auth/register' ? 'active' : '' %>" href="/auth/register">Register</a></li>
         <% } else { %>
           <li class="nav-item"><a class="nav-link <%= path === '/dashboard' ? 'active' : '' %>" href="/dashboard">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link <%= path === '/reservation' ? 'active' : '' %>" href="/reservation">Reservation</a></li>
           <li class="nav-item ms-lg-2">
             <form action="/auth/logout" method="POST">
               <button class="btn btn-sm btn-light px-3" type="submit">Logout</button>
