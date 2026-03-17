@@ -1,5 +1,40 @@
 <section class="py-4">
-    <div class="container">
-        
+  <div class="container">
+    <div class="row justify-content-md-center">
+      <div class="col-lg-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-body p-4">
+            <h2 class="h5 mb-3">New sit-in record</h2>
+            <form
+              action="/dashboard/time-in"
+              method="POST"
+              class="vstack gap-3"
+            >
+              <div>
+                <label class="form-label">Lab Room</label>
+                <select class="form-select" name="lab_room" required>
+                  <option value="" disabled selected>Select lab room</option>
+                  <option>Lab 524</option>
+                  <option>Lab 526</option>
+                  <option>Lab 528</option>
+                  <option>Networking Lab</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Purpose</label>
+                <textarea
+                  class="form-control"
+                  name="purpose"
+                  rows="4"
+                  placeholder="Ex. Programming activity, research, project work"
+                  required
+                ></textarea>
+              </div>
+              <button class="btn btn-primary" type="submit">Time In</button>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 </section>

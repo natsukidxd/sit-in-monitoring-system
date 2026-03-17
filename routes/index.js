@@ -14,7 +14,7 @@ router.get('/about', (req, res) => {
 });
 
 router.get('/reservation', (req, res) => {
-  res.render("/reservation", { title: 'Reservation'});
+  res.render('reservation', { title: 'Reservation'});
 });
 
 module.exports = router;
