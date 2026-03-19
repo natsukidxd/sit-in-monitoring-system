@@ -14,7 +14,8 @@ router.get('/about', (req, res) => {
 });
 
 router.get('/reservation', (req, res) => {
-  res.render('reservation', { title: 'Reservation'});
+  if (!req.session.user) return res.redirect('/auth/login');
+  res.redirect('/dashboard/reservation');
 });
 
 module.exports = router;

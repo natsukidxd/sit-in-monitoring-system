@@ -1,0 +1,50 @@
+<section class="py-4">
+  <div class="container-fluid px-lg-4">
+    <div class="history-card">
+      <h1 class="text-center fw-bold mb-4">History Information</h1>
+      <div class="table-responsive">
+        <table class="table history-table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>ID Number</th>
+              <th>Name</th>
+              <th>Sit Purpose</th>
+              <th>Laboratory</th>
+              <th>Login</th>
+              <th>Logout</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (records.length === 0) { %>
+              <tr>
+                <td colspan="8" class="text-center py-4">No history found.</td>
+              </tr>
+            <% } %>
+            <% records.forEach(record => { %>
+              <tr>
+                <td><%= currentUser.id_number %></td>
+                <td><%= currentUser.first_name || currentUser.name.split(' ')[0] %> <%= currentUser.last_name || '' %></td>
+                <td><%= record.purpose %></td>
+                <td><%= record.lab_room %></td>
+                <td><%= record.time_in || '-' %></td>
+                <td><%= record.time_out || '-' %></td>
+                <td><%= (record.time_in || '').split(' ')[0] || '-' %></td>
+                <td>
+                  <% if (record.status === 'Active') { %>
+                    <form action="/dashboard/time-out/<%= record.id %>" method="POST">
+                      <button class="btn btn-success btn-sm">Time Out</button>
+                    </form>
+                  <% } else { %>
+                    <button class="btn btn-success btn-sm" type="button" disabled>Feedback</button>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

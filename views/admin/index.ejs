@@ -1,0 +1,209 @@
+<section class="py-3 py-lg-4">
+  <div class="container-fluid px-lg-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="mb-1">Admin Dashboard</h2>
+        <p class="text-muted mb-0">
+          Manage users, sit-in records, and reservations.
+        </p>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-6 col-xl-2">
+        <div class="summary-card">
+          <span>Total Students</span>
+          <strong><%= stats.totalStudents %></strong>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-2">
+        <div class="summary-card">
+          <span>Total Admins</span>
+          <strong><%= stats.totalAdmins %></strong>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-2">
+        <div class="summary-card">
+          <span>Active Sit-ins</span>
+          <strong><%= stats.activeSitins %></strong>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-2">
+        <div class="summary-card">
+          <span>Completed Sit-ins</span>
+          <strong><%= stats.completedSitins %></strong>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-2">
+        <div class="summary-card">
+          <span>Pending Reservations</span>
+          <strong><%= stats.pendingReservations %></strong>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-2">
+        <div class="summary-card">
+          <span>Total Reservations</span>
+          <strong><%= stats.totalReservations %></strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-xl-7">
+        <div class="panel-card">
+          <div class="panel-header">Recent Sit-in Records</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>ID Number</th>
+                  <th>Name</th>
+                  <th>Lab</th>
+                  <th>Purpose</th>
+                  <th>Status</th>
+                  <th>Time In</th>
+                  <th>Time Out</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!recentRecords.length) { %>
+                <tr>
+                  <td colspan="8" class="text-center text-muted">
+                    No records found.
+                  </td>
+                </tr>
+                <% } %> <% recentRecords.forEach(record => { %>
+                <tr>
+                  <td><%= record.id_number %></td>
+                  <td><%= record.first_name %> <%= record.last_name %></td>
+                  <td><%= record.lab_room %></td>
+                  <td><%= record.purpose %></td>
+                  <td>
+                    <span
+                      class="badge <%= record.status === 'Active' ? 'bg-success' : 'bg-secondary' %>"
+                    >
+                      <%= record.status %>
+                    </span>
+                  </td>
+                  <td>
+                    <%= record.time_in ? new
+                    Date(record.time_in).toLocaleString() : '-' %>
+                  </td>
+                  <td>
+                    <%= record.time_out ? new
+                    Date(record.time_out).toLocaleString() : '-' %>
+                  </td>
+                  <td>
+                    <% if (record.status === 'Active') { %>
+                    <form
+                      action="/admin/records/<%= record.id %>/timeout"
+                      method="POST"
+                    >
+                      <button class="btn btn-sm btn-danger">
+                        Force Time-out
+                      </button>
+                    </form>
+                    <% } else { %>
+                    <span class="text-muted small">No action</span>
+                    <% } %>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-5">
+        <div class="panel-card mb-3">
+          <div class="panel-header">Pending Reservations</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>ID Number</th>
+                  <th>Name</th>
+                  <th>Lab</th>
+                  <th>Purpose</th>
+                  <th>Schedule</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!pendingReservations.length) { %>
+                <tr>
+                  <td colspan="6" class="text-center text-muted">
+                    No pending reservations.
+                  </td>
+                </tr>
+                <% } %> <% pendingReservations.forEach(item => { %>
+                <tr>
+                  <td><%= item.id_number %></td>
+                  <td><%= item.first_name %> <%= item.last_name %></td>
+                  <td><%= item.lab_room %></td>
+                  <td><%= item.purpose %></td>
+                  <td>
+                    <%= new Date(item.reservation_time).toLocaleString() %>
+                  </td>
+                  <td class="d-flex gap-2">
+                    <form
+                      action="/admin/reservations/<%= item.id %>/approve"
+                      method="POST"
+                    >
+                      <button class="btn btn-sm btn-success">Approve</button>
+                    </form>
+                    <form
+                      action="/admin/reservations/<%= item.id %>/reject"
+                      method="POST"
+                    >
+                      <button class="btn btn-sm btn-outline-danger">
+                        Reject
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">Latest Students</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>ID Number</th>
+                  <th>Name</th>
+                  <th>Course</th>
+                  <th>Year</th>
+                  <th>Used Sessions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!users.length) { %>
+                <tr>
+                  <td colspan="5" class="text-center text-muted">
+                    No students found.
+                  </td>
+                </tr>
+                <% } %> <% users.forEach(user => { %>
+                <tr>
+                  <td><%= user.id_number %></td>
+                  <td><%= user.first_name %> <%= user.last_name %></td>
+                  <td><%= user.course %></td>
+                  <td><%= user.course_level %></td>
+                  <td><%= user.used_sessions %></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

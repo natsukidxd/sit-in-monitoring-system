@@ -37,6 +37,19 @@ function initializeDatabase() {
       )
     `);
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        lab_room TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        reservation_time DATETIME NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+
     db.get(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`, async (err, row) => {
       if (err) {
         console.error(err.message);

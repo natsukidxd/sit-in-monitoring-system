@@ -1,0 +1,189 @@
+<section class="py-4">
+  <div class="container">
+    <div class="profile-card mx-auto">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-6">
+          <h2 class="fw-bold mb-4 text-center text-lg-start">Edit Profile</h2>
+          <form action="/dashboard/profile" method="POST" class="row g-3">
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  value="<%= user.id_number %>"
+                  id="id_number"
+                  placeholder=""
+                  disabled
+                />
+                <label for="id_number">ID Number</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="last_name"
+                  id="last_name"
+                  value="<%= user.last_name %>"
+                  placeholder=""
+                  required
+                />
+                <label for="last_name">Last Name</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="first_name"
+                  id="first_name"
+                  value="<%= user.first_name %>"
+                  placeholder=""
+                  required
+                />
+                <label for="first_name">First Name</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="middle_name"
+                  id="middle_name"
+                  value="<%= user.middle_name %>"
+                  placeholder=""
+                />
+                <label for="middle_name">Middle Name</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="address"
+                  id="address"
+                  value="<%= user.address %>"
+                  placeholder=""
+                />
+                <label for="address">Address</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <select name="course" id="course" class="form-select" required>
+                  <% if (user.course === 'BSIT') { %>
+                  <option value="BSIT" selected>BSIT</option>
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSCS-AI">BSCS-AI</option>
+                  <% } else if (user.course === 'BSCS') { %>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSCS" selected>BSCS</option>
+                  <option value="BSCS-AI">BSCS-AI</option>
+                  <% } else if (user.course === 'BSCS-AI') { %>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSCS-AI" selected>BSCS-AI</option>
+                  <% } else { %>
+                  <option value="" selected disabled hidden></option>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSCS-AI">BSCS-AI</option>
+                  <% } %>
+                </select>
+                <label for="course">Course</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <select
+                  name="course_level"
+                  id="course_level"
+                  class="form-select"
+                  required
+                >
+                  <% if (user.course_level == 1) { %>
+                  <option value="1" selected>1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <% } else if (user.course_level == 2) { %>
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <% } else if (user.course_level == 3) { %>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <% } else if (user.course_level == 4) { %>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4" selected>4</option>
+                  <% } else { %>
+                  <option value="" selected disabled hidden></option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <% } %>
+                </select>
+                <label for="course_level">Course Level</label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="email"
+                  class="form-control"
+                  name="email"
+                  id="email"
+                  value="<%= user.email %>"
+                  placeholder=""
+                  required
+                />
+                <label for="email">Email</label>
+              </div>
+            </div>
+
+            <div class="col-12 text-center text-lg">
+              <button class="btn btn-primary w-50 py-2 mb-4" type="submit">
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="col-lg-6 text-center">
+          <div class="profile-illustration">
+            <div class="profile-person">
+              <i class="bi bi-person-workspace"></i>
+            </div>
+            <div class="profile-device">
+              <div class="device-avatar">
+                <i class="bi bi-person-circle"></i>
+              </div>
+              <div class="device-line"></div>
+              <div class="device-line short"></div>
+              <button class="btn btn-danger btn-sm" type="button" disabled>
+                Sign Up
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

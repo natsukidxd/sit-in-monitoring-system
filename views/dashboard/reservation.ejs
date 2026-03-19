@@ -1,0 +1,69 @@
+<section class="py-4">
+  <div class="container">
+    <div class="reservation-card mx-auto">
+      <h2 class="text-center fw-bold mb-4">Reservation</h2>
+      <form action="/dashboard/reservation" method="POST" class="row g-3 align-items-end">
+        <div class="col-md-3"><label class="form-label">ID Number:</label></div>
+        <div class="col-md-9"><input class="form-control reservation-readonly" value="<%= user.id_number %>" readonly></div>
+
+        <div class="col-md-3"><label class="form-label">Student Name:</label></div>
+        <div class="col-md-9"><input class="form-control reservation-readonly" value="<%= user.first_name %> <%= user.middle_name %> <%= user.last_name %>" readonly></div>
+
+        <div class="col-md-3"><label class="form-label">Purpose:</label></div>
+        <div class="col-md-9"><input name="purpose" class="form-control" placeholder="Enter purpose" required></div>
+
+        <div class="col-md-3"><label class="form-label">Lab:</label></div>
+        <div class="col-md-9">
+          <select name="lab_room" class="form-select" required>
+            <option value="" selected disabled>Select laboratory</option>
+            <option value="524">524</option>
+            <option value="526">526</option>
+            <option value="528">528</option>
+            <option value="Networking Lab">Networking Lab</option>
+          </select>
+        </div>
+
+        <div class="col-md-3"></div>
+        <div class="col-md-9"><button class="btn btn-primary" type="submit">Reserve</button></div>
+
+        <div class="col-md-3"><label class="form-label">Time In:</label></div>
+        <div class="col-md-9"><input type="time" name="reservation_time" class="form-control" required></div>
+
+        <div class="col-md-3"><label class="form-label">Date:</label></div>
+        <div class="col-md-9"><input type="date" name="reservation_date" class="form-control" required></div>
+
+        <div class="col-md-3"><label class="form-label">Remaining Session:</label></div>
+        <div class="col-md-9"><input class="form-control reservation-readonly" value="<%= remainingSessions %>" readonly></div>
+      </form>
+    </div>
+
+    <div class="history-card mt-4">
+      <h3 class="fw-bold mb-3">Reservation List</h3>
+      <div class="table-responsive">
+        <table class="table history-table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Purpose</th>
+              <th>Laboratory</th>
+              <th>Schedule</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (reservations.length === 0) { %>
+              <tr><td colspan="4" class="text-center py-4">No reservations yet.</td></tr>
+            <% } %>
+            <% reservations.forEach(item => { %>
+              <tr>
+                <td><%= item.purpose %></td>
+                <td><%= item.lab_room %></td>
+                <td><%= item.reservation_time %></td>
+                <td><span class="badge text-bg-warning"><%= item.status %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

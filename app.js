@@ -43,6 +43,7 @@ app.use((req, res, next) => {
 app.use('/', require('./routes/index'));
 app.use('/auth', require('./routes/auth'));
 app.use('/dashboard', require('./routes/dashboard'));
+app.use("/admin", require("./routes/admin"));
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Page Not Found' });
