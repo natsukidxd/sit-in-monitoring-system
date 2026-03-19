@@ -4,7 +4,38 @@
       <div class="row align-items-center g-4">
         <div class="col-lg-6">
           <h2 class="fw-bold mb-4 text-center text-lg-start">Edit Profile</h2>
-          <form action="/dashboard/profile" method="POST" class="row g-3">
+
+          <form
+            action="/dashboard/profile"
+            method="POST"
+            enctype="multipart/form-data"
+            class="row g-3"
+          >
+            <div class="col-12 text-center mb-3">
+              <img
+                src="/profile-image/<%= user.image_url %>"
+                alt="Profile Picture"
+                class="rounded-circle border shadow-sm"
+                style="width: 140px; height: 140px; object-fit: cover;"
+              />
+            </div>
+
+            <div class="col-12">
+              <label for="profile_image" class="form-label fw-semibold"
+                >Profile Picture</label
+              >
+              <input
+                type="file"
+                class="form-control"
+                name="profile_image"
+                id="profile_image"
+                accept=".jpg,.jpeg,.png,.webp"
+              />
+              <div class="form-text">
+                Allowed file types: JPG, JPEG, PNG, WEBP. Max size: 2MB.
+              </div>
+            </div>
+
             <div class="col-12">
               <div class="form-floating mb-3">
                 <input
@@ -168,18 +199,25 @@
 
         <div class="col-lg-6 text-center">
           <div class="profile-illustration">
-            <div class="profile-person">
-              <i class="bi bi-person-workspace"></i>
-            </div>
-            <div class="profile-device">
-              <div class="device-avatar">
-                <i class="bi bi-person-circle"></i>
+            <div class="profile-device p-4 shadow-sm rounded-4 bg-white d-inline-block">
+              <div class="device-avatar mb-3">
+                <img
+                  src="/profile-image/<%= user.image_url %>"
+                  alt="Profile Preview"
+                  class="rounded-circle border"
+                  style="width: 120px; height: 120px; object-fit: cover;"
+                />
               </div>
+
+              <h5 class="fw-bold mb-1">
+                <%= user.first_name %> <%= user.last_name %>
+              </h5>
+              <p class="text-muted mb-2"><%= user.email %></p>
               <div class="device-line"></div>
               <div class="device-line short"></div>
-              <button class="btn btn-danger btn-sm" type="button" disabled>
-                Sign Up
-              </button>
+              <span class="badge bg-primary">
+                <%= user.course || 'No Course' %> - <%= user.course_level || '-' %>
+              </span>
             </div>
           </div>
         </div>

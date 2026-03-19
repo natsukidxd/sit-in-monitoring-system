@@ -6,15 +6,42 @@
           <div class="panel-header">Student Information</div>
           <div class="panel-body text-center">
             <div class="student-avatar mx-auto mb-4">
-              <i class="bi bi-person-circle"></i>
+              <img src="/profile-image/<%= user.image_url %>" alt="Student Profile" class="img-fluid rounded-circle border shadow-sm" style="width: 160px; height: 160px; object-fit: cover;" />
             </div>
+
             <div class="student-details text-start">
-              <p><i class="bi bi-person-fill"></i> <strong>Name:</strong> <%= user.first_name %> <%= user.middle_name %> <%= user.last_name %></p>
-              <p><i class="bi bi-mortarboard-fill"></i> <strong>Course:</strong> <%= user.course %></p>
-              <p><i class="bi bi-arrow-through-heart-fill"></i> <strong>Year:</strong> <%= user.course_level %></p>
-              <p><i class="bi bi-envelope-fill"></i> <strong>Email:</strong> <%= user.email %></p>
-              <p><i class="bi bi-postcard-fill"></i> <strong>Address:</strong> <%= user.address %></p>
-              <p><i class="bi bi-stopwatch-fill"></i> <strong>Session:</strong> <%= remainingSessions %></p>
+              <p>
+                <i class="bi bi-person-fill"></i>
+                <strong>Name:</strong>
+                <%= user.first_name %>
+                <%= user.middle_name || '' %>
+                <%= user.last_name %>
+              </p>
+              <p>
+                <i class="bi bi-mortarboard-fill"></i>
+                <strong>Course:</strong>
+                <%= user.course %>
+              </p>
+              <p>
+                <i class="bi bi-arrow-through-heart-fill"></i>
+                <strong>Year:</strong>
+                <%= user.course_level %>
+              </p>
+              <p>
+                <i class="bi bi-envelope-fill"></i>
+                <strong>Email:</strong>
+                <%= user.email %>
+              </p>
+              <p>
+                <i class="bi bi-postcard-fill"></i>
+                <strong>Address:</strong>
+                <%= user.address %>
+              </p>
+              <p>
+                <i class="bi bi-stopwatch-fill"></i>
+                <strong>Session:</strong>
+                <%= remainingSessions %>
+              </p>
             </div>
           </div>
         </div>
@@ -22,13 +49,15 @@
 
       <div class="col-xl-4">
         <div class="panel-card h-100">
-          <div class="panel-header d-flex align-items-center gap-2"><i class="bi bi-megaphone-fill"></i> Announcement</div>
+          <div class="panel-header d-flex align-items-center gap-2">
+            <i class="bi bi-megaphone-fill"></i> Announcement
+          </div>
           <div class="panel-body panel-scroll">
             <% announcements.forEach((item, index) => { %>
-              <div class="announcement-item <%= index !== announcements.length - 1 ? 'with-border' : '' %>">
-                <h5><%= item.author %> | <%= item.date %></h5>
-                <div class="announcement-box"><%= item.body %></div>
-              </div>
+            <div class="announcement-item <%= index !== announcements.length - 1 ? 'with-border' : '' %>">
+              <h5><%= item.author %> | <%= item.date %></h5>
+              <div class="announcement-box"><%= item.body %></div>
+            </div>
             <% }) %>
           </div>
         </div>
@@ -39,12 +68,17 @@
           <div class="panel-header">Rules and Regulation</div>
           <div class="panel-body panel-scroll rules-panel">
             <h2 class="text-center fw-bold mb-2">University of Cebu</h2>
-            <h4 class="text-center fw-bold mb-4">COLLEGE OF INFORMATION &amp; COMPUTER STUDIES</h4>
+            <h4 class="text-center fw-bold mb-4">
+              COLLEGE OF INFORMATION &amp; COMPUTER STUDIES
+            </h4>
             <h5 class="fw-bold mb-4">LABORATORY RULES AND REGULATIONS</h5>
-            <p>To avoid embarrassment and maintain camaraderie with your friends and superiors at our laboratories, please observe the following:</p>
+            <p>
+              To avoid embarrassment and maintain camaraderie with your friends
+              and superiors at our laboratories, please observe the following:
+            </p>
             <ol class="rules-list">
               <% rules.forEach(rule => { %>
-                <li><%= rule %></li>
+              <li><%= rule %></li>
               <% }) %>
             </ol>
           </div>
@@ -54,13 +88,24 @@
 
     <div class="row g-3 mt-1">
       <div class="col-md-4">
-        <div class="summary-card"><span>Completed Sessions</span><strong><%= completedSessions %></strong></div>
+        <div class="summary-card">
+          <span>Completed Sessions</span>
+          <strong><%= completedSessions %></strong>
+        </div>
       </div>
+
       <div class="col-md-4">
-        <div class="summary-card"><span>Active Sessions</span><strong><%= activeSessions %></strong></div>
+        <div class="summary-card">
+          <span>Active Sessions</span>
+          <strong><%= activeSessions %></strong>
+        </div>
       </div>
+
       <div class="col-md-4">
-        <div class="summary-card"><span>Pending Reservations</span><strong><%= pendingReservations %></strong></div>
+        <div class="summary-card">
+          <span>Pending Reservations</span>
+          <strong><%= pendingReservations %></strong>
+        </div>
       </div>
     </div>
   </div>

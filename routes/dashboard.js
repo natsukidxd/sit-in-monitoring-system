@@ -1,33 +1,67 @@
-const express = require('express');
-const { db } = require('../db');
-
+const express = require("express");
+const path = require("path");
+const { db } = require("../db");
+const multer = require("multer");
 const router = express.Router();
 const MAX_SESSIONS = 30;
 
 const announcements = [
   {
-    author: 'CCS Admin',
-    date: '2026-Feb-11',
-    body: 'Please keep your reservation details updated before your scheduled laboratory use.'
+    author: "CCS Admin",
+    date: "2026-Feb-11",
+    body: "Please keep your reservation details updated before your scheduled laboratory use.",
   },
   {
-    author: 'CCS Admin',
-    date: '2024-May-08',
-    body: 'Important Announcement: We are excited to announce the launch of our new website. Explore our latest products and services now!'
-  }
+    author: "CCS Admin",
+    date: "2024-May-08",
+    body: "Important Announcement: We are excited to announce the launch of our new website. Explore our latest products and services now!",
+  },
 ];
 
 const rules = [
-  'Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans, and other personal pieces of equipment must be switched off.',
-  'Games are not allowed inside the lab. This includes computer-related games, card games, and other games that may disturb the operation of the lab.',
-  'Surfing the internet is allowed only with the permission of the instructor. Downloading and installing software are strictly prohibited unless authorized.',
-  'Observe cleanliness and proper use of all laboratory equipment at all times.'
+  "Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans, and other personal pieces of equipment must be switched off.",
+  "Games are not allowed inside the lab. This includes computer-related games, card games, and other games that may disturb the operation of the lab.",
+  "Surfing the internet is allowed only with the permission of the instructor. Downloading and installing software are strictly prohibited unless authorized.",
+  "Observe cleanliness and proper use of all laboratory equipment at all times.",
 ];
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "../uploads/profiles"));
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const safeName = `${req.session.user.id_number}-${Date.now()}${ext}`;
+    cb(null, safeName);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|webp/;
+  const extValid = allowedTypes.test(
+    path.extname(file.originalname).toLowerCase(),
+  );
+  const mimeValid = allowedTypes.test(file.mimetype);
+
+  if (extValid && mimeValid) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPG, JPEG, PNG, and WEBP files are allowed."));
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});
 
 function requireAuth(req, res, next) {
   if (!req.session.user) {
-    req.session.error = 'Please log in first.';
-    return res.redirect('/auth/login');
+    req.session.error = "Please log in first.";
+    return res.redirect("/auth/login");
   }
   next();
 }
@@ -49,7 +83,8 @@ function refreshSessionUser(req, user) {
     last_name: user.last_name,
     middle_name: user.middle_name,
     course_level: user.course_level,
-    address: user.address
+    address: user.address,
+    image_url: user.image_url || "/images/profiles/default.png",
   };
 }
 
@@ -70,7 +105,7 @@ function getRecords(userId) {
       (err, rows) => {
         if (err) return reject(err);
         resolve(rows || []);
-      }
+      },
     );
   });
 }
@@ -83,29 +118,35 @@ function getReservations(userId) {
       (err, rows) => {
         if (err) return reject(err);
         resolve(rows || []);
-      }
+      },
     );
   });
 }
 
-router.get('/', requireAuth, async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   const userId = req.session.user.id;
 
   try {
     const [user, records, reservations] = await Promise.all([
       getUserById(userId),
       getRecords(userId),
-      getReservations(userId)
+      getReservations(userId),
     ]);
 
     if (user) refreshSessionUser(req, user);
 
-    const completedSessions = records.filter(record => record.status === 'Completed').length;
-    const activeSessions = records.filter(record => record.status === 'Active').length;
-    const pendingReservations = reservations.filter(item => item.status === 'Pending').length;
+    const completedSessions = records.filter(
+      (record) => record.status === "Completed",
+    ).length;
+    const activeSessions = records.filter(
+      (record) => record.status === "Active",
+    ).length;
+    const pendingReservations = reservations.filter(
+      (item) => item.status === "Pending",
+    ).length;
 
-    res.render('dashboard/index', {
-      title: 'Dashboard',
+    res.render("dashboard/index", {
+      title: "Dashboard",
       user,
       announcements,
       rules,
@@ -114,61 +155,63 @@ router.get('/', requireAuth, async (req, res) => {
       activeSessions,
       completedSessions,
       remainingSessions: Math.max(0, MAX_SESSIONS - completedSessions),
-      pendingReservations
+      pendingReservations,
     });
   } catch (error) {
     console.error(error);
-    req.session.error = 'Unable to load dashboard.';
-    res.redirect('/');
+    req.session.error = "Unable to load dashboard.";
+    res.redirect("/");
   }
 });
 
-router.get('/history', requireAuth, async (req, res) => {
+router.get("/history", requireAuth, async (req, res) => {
   try {
     const records = await getRecords(req.session.user.id);
-    res.render('dashboard/history', {
-      title: 'History',
-      records
+    res.render("dashboard/history", {
+      title: "History",
+      records,
     });
   } catch (error) {
     console.error(error);
-    req.session.error = 'Unable to load history.';
-    res.redirect('/dashboard');
+    req.session.error = "Unable to load history.";
+    res.redirect("/dashboard");
   }
 });
 
-router.get('/reservation', requireAuth, async (req, res) => {
+router.get("/reservation", requireAuth, async (req, res) => {
   try {
     const [user, reservations, records] = await Promise.all([
       getUserById(req.session.user.id),
       getReservations(req.session.user.id),
-      getRecords(req.session.user.id)
+      getRecords(req.session.user.id),
     ]);
 
     if (user) refreshSessionUser(req, user);
 
-    const completedSessions = records.filter(record => record.status === 'Completed').length;
+    const completedSessions = records.filter(
+      (record) => record.status === "Completed",
+    ).length;
 
-    res.render('dashboard/reservation', {
-      title: 'Reservation',
+    res.render("dashboard/reservation", {
+      title: "Reservation",
       user,
       reservations,
-      remainingSessions: Math.max(0, MAX_SESSIONS - completedSessions)
+      remainingSessions: Math.max(0, MAX_SESSIONS - completedSessions),
     });
   } catch (error) {
     console.error(error);
-    req.session.error = 'Unable to load reservation page.';
-    res.redirect('/dashboard');
+    req.session.error = "Unable to load reservation page.";
+    res.redirect("/dashboard");
   }
 });
 
-router.post('/reservation', requireAuth, async (req, res) => {
+router.post("/reservation", requireAuth, async (req, res) => {
   const { lab_room, purpose, reservation_date, reservation_time } = req.body;
   const reservationTime = formatDateTime(reservation_date, reservation_time);
 
   if (!lab_room || !purpose || !reservationTime) {
-    req.session.error = 'Please complete the reservation form.';
-    return res.redirect('/dashboard/reservation');
+    req.session.error = "Please complete the reservation form.";
+    return res.redirect("/dashboard/reservation");
   }
 
   db.run(
@@ -177,75 +220,110 @@ router.post('/reservation', requireAuth, async (req, res) => {
     function (err) {
       if (err) {
         console.error(err);
-        req.session.error = 'Unable to save reservation.';
-        return res.redirect('/dashboard/reservation');
+        req.session.error = "Unable to save reservation.";
+        return res.redirect("/dashboard/reservation");
       }
 
-      req.session.message = 'Reservation submitted successfully.';
-      res.redirect('/dashboard/reservation');
-    }
+      req.session.message = "Reservation submitted successfully.";
+      res.redirect("/dashboard/reservation");
+    },
   );
 });
 
-router.get('/profile', requireAuth, async (req, res) => {
-  try {
-    const user = await getUserById(req.session.user.id);
-    if (user) refreshSessionUser(req, user);
-    res.render('dashboard/profile', {
-      title: 'Edit Profile',
-      user
-    });
-  } catch (error) {
-    console.error(error);
-    req.session.error = 'Unable to load profile.';
-    res.redirect('/dashboard');
-  }
-});
-
-router.post('/profile', requireAuth, (req, res) => {
-  const {
-    last_name,
-    first_name,
-    middle_name,
-    course_level,
-    email,
-    course,
-    address
-  } = req.body;
-
-  if (!last_name || !first_name || !course_level || !email || !course || !address) {
-    req.session.error = 'Please complete all required fields.';
-    return res.redirect('/dashboard/profile');
-  }
-
-  db.run(
-    `UPDATE users
-     SET last_name = ?, first_name = ?, middle_name = ?, course_level = ?, email = ?, course = ?, address = ?
+router.get("/profile", requireAuth, (req, res) => {
+  db.get(
+    `SELECT id, id_number, first_name, last_name, middle_name, email, course, course_level, address, image_url
+     FROM users
      WHERE id = ?`,
-    [last_name, first_name, middle_name || '', course_level, email, course, address, req.session.user.id],
-    async function (err) {
-      if (err) {
-        console.error(err);
-        req.session.error = 'Unable to update profile. Email may already be in use.';
-        return res.redirect('/dashboard/profile');
+    [req.session.user.id],
+    (err, user) => {
+      if (err || !user) {
+        req.session.error = "Unable to load profile.";
+        return res.redirect("/dashboard");
       }
 
-      const updatedUser = await getUserById(req.session.user.id);
-      if (updatedUser) refreshSessionUser(req, updatedUser);
-
-      req.session.message = 'Profile updated successfully.';
-      res.redirect('/dashboard/profile');
-    }
+      res.render("dashboard/profile", {
+        title: "Edit Profile",
+        user,
+      });
+    },
   );
 });
 
-router.post('/time-in', requireAuth, (req, res) => {
+router.post(
+  "/profile",
+  requireAuth,
+  upload.single("profile_image"),
+  (req, res) => {
+    const {
+      first_name,
+      last_name,
+      middle_name,
+      email,
+      course,
+      course_level,
+      address,
+    } = req.body;
+
+    db.get(
+      "SELECT image_url FROM users WHERE id = ?",
+      [req.session.user.id],
+      (fetchErr, existingUser) => {
+        if (fetchErr || !existingUser) {
+          req.session.error = "Unable to update profile.";
+          return res.redirect("/dashboard/profile");
+        }
+
+        const imageUrl = req.file
+          ? req.file.filename
+          : existingUser.image_url || "default.png";
+
+        db.run(
+          `UPDATE users
+         SET first_name = ?, last_name = ?, middle_name = ?, email = ?, course = ?, course_level = ?, address = ?, image_url = ?
+         WHERE id = ?`,
+          [
+            first_name,
+            last_name,
+            middle_name,
+            email,
+            course,
+            course_level,
+            address,
+            imageUrl,
+            req.session.user.id,
+          ],
+          function (err) {
+            if (err) {
+              console.error(err);
+              req.session.error = "Failed to update profile.";
+              return res.redirect("/dashboard/profile");
+            }
+
+            req.session.user.first_name = first_name;
+            req.session.user.last_name = last_name;
+            req.session.user.email = email;
+            req.session.user.course = course;
+            req.session.user.course_level = course_level;
+            req.session.user.address = address;
+            req.session.user.image_url = imageUrl;
+
+            req.session.message = "Profile updated successfully.";
+            res.redirect("/dashboard/profile");
+          },
+        );
+      },
+    );
+  },
+);
+
+router.post("/time-in", requireAuth, (req, res) => {
   const { lab_room, purpose } = req.body;
   const userId = req.session.user.id;
 
   if (!lab_room || !purpose) {
-    req.session.error = 'Lab room and purpose are required.';
-    return res.redirect('/dashboard');
+    req.session.error = "Lab room and purpose are required.";
+    return res.redirect("/dashboard");
   }
 
   db.get(
@@ -253,23 +331,23 @@ router.post('/time-in', requireAuth, (req, res) => {
     [userId],
     (err, row) => {
       if (row) {
-        req.session.error = 'You already have an active sit-in session.';
-        return res.redirect('/dashboard');
+        req.session.error = "You already have an active sit-in session.";
+        return res.redirect("/dashboard");
       }
 
       db.run(
         `INSERT INTO sitin_records (user_id, lab_room, purpose) VALUES (?, ?, ?)`,
         [userId, lab_room, purpose],
         () => {
-          req.session.message = 'Time-in recorded successfully.';
-          res.redirect('/dashboard/history');
-        }
+          req.session.message = "Time-in recorded successfully.";
+          res.redirect("/dashboard/history");
+        },
       );
-    }
+    },
   );
 });
 
-router.post('/time-out/:id', requireAuth, (req, res) => {
+router.post("/time-out/:id", requireAuth, (req, res) => {
   const recordId = req.params.id;
   const userId = req.session.user.id;
 
@@ -279,10 +357,29 @@ router.post('/time-out/:id', requireAuth, (req, res) => {
      WHERE id = ? AND user_id = ? AND status = 'Active'`,
     [recordId, userId],
     function () {
-      req.session.message = this.changes ? 'Time-out recorded successfully.' : 'No active record found.';
-      res.redirect('/dashboard/history');
-    }
+      req.session.message = this.changes
+        ? "Time-out recorded successfully."
+        : "No active record found.";
+      res.redirect("/dashboard/history");
+    },
   );
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    req.session.error =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "Profile image must be less than 2MB."
+        : "Upload error.";
+    return res.redirect("/dashboard/profile");
+  }
+
+  if (err) {
+    req.session.error = err.message || "Something went wrong during upload.";
+    return res.redirect("/dashboard/profile");
+  }
+
+  next();
 });
 
 module.exports = router;

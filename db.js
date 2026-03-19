@@ -1,8 +1,8 @@
-const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
-const bcrypt = require('bcryptjs');
+const path = require("path");
+const sqlite3 = require("sqlite3").verbose();
+const bcrypt = require("bcryptjs");
 
-const dbPath = path.join(__dirname, 'data', 'sitin.sqlite');
+const dbPath = path.join(__dirname, "data", "sitin.sqlite");
 const db = new sqlite3.Database(dbPath);
 
 function initializeDatabase() {
@@ -11,15 +11,16 @@ function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         id_number TEXT UNIQUE NOT NULL,
-        last_name TEXT NOT NULL,
         first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
         middle_name TEXT,
-        course_level TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
-        course TEXT NOT NULL,
-        address TEXT NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'student',
+        password TEXT NOT NULL,
+        course TEXT,
+        course_level TEXT,
+        address TEXT,
+        role TEXT DEFAULT 'student',
+        image_url TEXT DEFAULT '/images/profiles/default.png',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -50,20 +51,34 @@ function initializeDatabase() {
       )
     `);
 
-    db.get(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`, async (err, row) => {
-      if (err) {
-        console.error(err.message);
-        return;
-      }
-      if (!row) {
-        const passwordHash = await bcrypt.hash('admin123', 10);
-        db.run(
-          `INSERT INTO users (id_number, last_name, first_name, middle_name, course_level, email, course, address, password_hash, role)
+    db.get(
+      `SELECT id FROM users WHERE role = 'admin' LIMIT 1`,
+      async (err, row) => {
+        if (err) {
+          console.error(err.message);
+          return;
+        }
+        if (!row) {
+          const passwordHash = await bcrypt.hash("admin123", 10);
+          db.run(
+            `INSERT INTO users (id_number, last_name, first_name, middle_name, course_level, email, course, address, password_hash, role)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          ['1', 'Administrator', 'System', '', 'N/A', 'admin@ccs.local', 'Administration', 'CCS Office', passwordHash, 'admin']
-        );
-      }
-    });
+            [
+              "1",
+              "Administrator",
+              "System",
+              "",
+              "N/A",
+              "admin@ccs.local",
+              "Administration",
+              "CCS Office",
+              passwordHash,
+              "admin",
+            ],
+          );
+        }
+      },
+    );
   });
 }
 
