@@ -1,46 +1,120 @@
 <section class="py-3 py-lg-4">
   <div class="container-fluid px-lg-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <h2 class="mb-1">Admin Dashboard</h2>
-        <p class="text-muted mb-0">
-          Manage users, sit-in records, and reservations.
-        </p>
+    <div class="row g-3">
+      <div class="col-xl-3">
+        <div class="panel-card h-100">
+          <div class="panel-header">Admin Information</div>
+          <div class="panel-body text-center">
+            <img
+              src="/profile-image/<%= admin?.image_url || 'default.png' %>"
+              alt="Admin Profile"
+              class="img-fluid rounded-circle border shadow-sm"
+              style="width: 160px; height: 160px; object-fit: cover;"
+            />
+
+            <div class="student-details text-start mt-3">
+              <p>
+                <i class="bi bi-person-fill"></i>
+                <strong>Name:</strong>
+                <%= admin?.first_name || '' %>
+                <%= admin?.middle_name || '' %>
+                <%= admin?.last_name || '' %>
+              </p>
+              <p>
+                <i class="bi bi-hash"></i>
+                <strong>ID Number:</strong>
+                <%= admin?.id_number || '-' %>
+              </p>
+              <p>
+                <i class="bi bi-shield-check"></i>
+                <strong>Role:</strong>
+                <%= admin?.role || 'admin' %>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="panel-card h-100">
+          <div class="panel-header d-flex align-items-center gap-2">
+            <i class="bi bi-megaphone-fill"></i> Announcement
+          </div>
+          <div class="panel-body panel-scroll">
+            <% announcements.forEach((item, index) => { %>
+            <div
+              class="announcement-item <%= index !== announcements.length - 1 ? 'with-border' : '' %>"
+            >
+              <h5><%= item.author %> | <%= item.date %></h5>
+              <div class="announcement-box"><%= item.body %></div>
+            </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-5">
+        <div class="panel-card h-100">
+          <div class="panel-header">Rules and Regulation</div>
+          <div class="panel-body panel-scroll rules-panel">
+            <h2 class="text-center fw-bold mb-2">University of Cebu</h2>
+            <h4 class="text-center fw-bold mb-4">
+              COLLEGE OF INFORMATION &amp; COMPUTER STUDIES
+            </h4>
+            <h5 class="fw-bold mb-4">LABORATORY RULES AND REGULATIONS</h5>
+            <p>
+              To avoid embarrassment and maintain camaraderie with your friends
+              and superiors at our laboratories, please observe the following:
+            </p>
+            <ol class="rules-list">
+              <% rules.forEach(rule => { %>
+              <li><%= rule %></li>
+              <% }) %>
+            </ol>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="row g-3 mb-4">
-      <div class="col-md-6 col-xl-2">
+    <div class="row g-3 mt-1">
+      <div class="col-md-4">
         <div class="summary-card">
           <span>Total Students</span>
           <strong><%= stats.totalStudents %></strong>
         </div>
       </div>
-      <div class="col-md-6 col-xl-2">
+
+      <div class="col-md-4">
         <div class="summary-card">
           <span>Total Admins</span>
           <strong><%= stats.totalAdmins %></strong>
         </div>
       </div>
-      <div class="col-md-6 col-xl-2">
+
+      <div class="col-md-4">
         <div class="summary-card">
           <span>Active Sit-ins</span>
           <strong><%= stats.activeSitins %></strong>
         </div>
       </div>
-      <div class="col-md-6 col-xl-2">
+    </div>
+
+    <div class="row g-3 mt-1">
+      <div class="col-md-4">
         <div class="summary-card">
           <span>Completed Sit-ins</span>
           <strong><%= stats.completedSitins %></strong>
         </div>
       </div>
-      <div class="col-md-6 col-xl-2">
+
+      <div class="col-md-4">
         <div class="summary-card">
           <span>Pending Reservations</span>
           <strong><%= stats.pendingReservations %></strong>
         </div>
       </div>
-      <div class="col-md-6 col-xl-2">
+
+      <div class="col-md-4">
         <div class="summary-card">
           <span>Total Reservations</span>
           <strong><%= stats.totalReservations %></strong>
@@ -48,12 +122,12 @@
       </div>
     </div>
 
-    <div class="row g-3">
-      <div class="col-xl-7">
-        <div class="panel-card">
+    <div class="row g-3 mt-3">
+      <div class="col-xl-6">
+        <div class="panel-card h-100">
           <div class="panel-header">Recent Sit-in Records</div>
           <div class="panel-body table-responsive">
-            <table class="table table-bordered align-middle">
+            <table class="table table-bordered align-middle mb-0">
               <thead>
                 <tr>
                   <th>ID Number</th>
@@ -69,11 +143,13 @@
               <tbody>
                 <% if (!recentRecords.length) { %>
                 <tr>
-                  <td colspan="8" class="text-center text-muted">
+                  <td colspan="8" class="text-center py-4 text-muted">
                     No records found.
                   </td>
                 </tr>
-                <% } %> <% recentRecords.forEach(record => { %>
+                <% } %>
+
+                <% recentRecords.forEach(record => { %>
                 <tr>
                   <td><%= record.id_number %></td>
                   <td><%= record.first_name %> <%= record.last_name %></td>
@@ -87,12 +163,10 @@
                     </span>
                   </td>
                   <td>
-                    <%= record.time_in ? new
-                    Date(record.time_in).toLocaleString() : '-' %>
+                    <%= record.time_in ? new Date(record.time_in).toLocaleString() : '-' %>
                   </td>
                   <td>
-                    <%= record.time_out ? new
-                    Date(record.time_out).toLocaleString() : '-' %>
+                    <%= record.time_out ? new Date(record.time_out).toLocaleString() : '-' %>
                   </td>
                   <td>
                     <% if (record.status === 'Active') { %>
@@ -100,7 +174,7 @@
                       action="/admin/records/<%= record.id %>/timeout"
                       method="POST"
                     >
-                      <button class="btn btn-sm btn-danger">
+                      <button class="btn btn-sm btn-danger" type="submit">
                         Force Time-out
                       </button>
                     </form>
@@ -116,11 +190,11 @@
         </div>
       </div>
 
-      <div class="col-xl-5">
-        <div class="panel-card mb-3">
+      <div class="col-xl-6">
+        <div class="panel-card h-100">
           <div class="panel-header">Pending Reservations</div>
           <div class="panel-body table-responsive">
-            <table class="table table-bordered align-middle">
+            <table class="table table-bordered align-middle mb-0">
               <thead>
                 <tr>
                   <th>ID Number</th>
@@ -134,31 +208,35 @@
               <tbody>
                 <% if (!pendingReservations.length) { %>
                 <tr>
-                  <td colspan="6" class="text-center text-muted">
+                  <td colspan="6" class="text-center py-4 text-muted">
                     No pending reservations.
                   </td>
                 </tr>
-                <% } %> <% pendingReservations.forEach(item => { %>
+                <% } %>
+
+                <% pendingReservations.forEach(item => { %>
                 <tr>
                   <td><%= item.id_number %></td>
                   <td><%= item.first_name %> <%= item.last_name %></td>
                   <td><%= item.lab_room %></td>
                   <td><%= item.purpose %></td>
                   <td>
-                    <%= new Date(item.reservation_time).toLocaleString() %>
+                    <%= item.reservation_time ? new Date(item.reservation_time).toLocaleString() : '-' %>
                   </td>
                   <td class="d-flex gap-2">
                     <form
                       action="/admin/reservations/<%= item.id %>/approve"
                       method="POST"
                     >
-                      <button class="btn btn-sm btn-success">Approve</button>
+                      <button class="btn btn-sm btn-success" type="submit">
+                        Approve
+                      </button>
                     </form>
                     <form
                       action="/admin/reservations/<%= item.id %>/reject"
                       method="POST"
                     >
-                      <button class="btn btn-sm btn-outline-danger">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">
                         Reject
                       </button>
                     </form>
@@ -169,11 +247,15 @@
             </table>
           </div>
         </div>
+      </div>
+    </div>
 
+    <div class="row g-3 mt-1">
+      <div class="col-xl-12">
         <div class="panel-card">
           <div class="panel-header">Latest Students</div>
           <div class="panel-body table-responsive">
-            <table class="table table-bordered align-middle">
+            <table class="table table-bordered align-middle mb-0">
               <thead>
                 <tr>
                   <th>ID Number</th>
@@ -186,11 +268,13 @@
               <tbody>
                 <% if (!users.length) { %>
                 <tr>
-                  <td colspan="5" class="text-center text-muted">
+                  <td colspan="5" class="text-center py-4 text-muted">
                     No students found.
                   </td>
                 </tr>
-                <% } %> <% users.forEach(user => { %>
+                <% } %>
+
+                <% users.forEach(user => { %>
                 <tr>
                   <td><%= user.id_number %></td>
                   <td><%= user.first_name %> <%= user.last_name %></td>
