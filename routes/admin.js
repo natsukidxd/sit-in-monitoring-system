@@ -1,5 +1,6 @@
 const express = require("express");
 const { db } = require("../db");
+const { announcements, rules } = require("../dashboardContent");
 
 const router = express.Router();
 
@@ -43,9 +44,25 @@ function getAll(query, params = []) {
   });
 }
 
+function getUserById(userId) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT id, id_number, first_name, last_name, middle_name, email, course, course_level, address, role, image_url
+       FROM users
+       WHERE id = ?`,
+      [userId],
+      (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      },
+    );
+  });
+}
+
 router.get("/", requireAdmin, async (req, res) => {
   try {
     const [
+      adminUser,
       totalStudentsRow,
       totalAdminsRow,
       activeSitinsRow,
@@ -56,6 +73,7 @@ router.get("/", requireAdmin, async (req, res) => {
       pendingReservations,
       users,
     ] = await Promise.all([
+      getUserById(req.session.user.id),
       getOne(`SELECT COUNT(*) AS total FROM users WHERE role = 'student'`),
       getOne(`SELECT COUNT(*) AS total FROM users WHERE role = 'admin'`),
       getOne(
@@ -104,6 +122,7 @@ router.get("/", requireAdmin, async (req, res) => {
 
     res.render("admin/index", {
       title: "Admin Dashboard",
+      admin: adminUser,
       stats: {
         totalStudents: totalStudentsRow?.total || 0,
         totalAdmins: totalAdminsRow?.total || 0,
@@ -115,6 +134,8 @@ router.get("/", requireAdmin, async (req, res) => {
       recentRecords,
       pendingReservations,
       users,
+      announcements,
+      rules,
     });
   } catch (error) {
     console.error(error);

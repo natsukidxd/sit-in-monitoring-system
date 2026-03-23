@@ -47,6 +47,8 @@ router.post("/login", (req, res) => {
       };
 
       req.session.message = `Welcome back, ${user.first_name}!`;
+      // Used by the shared layout to show a login success popup/toast.
+      req.session.login_success = true;
       res.redirect(user.role === "admin" ? "/admin" : "/dashboard");
     }
   );

@@ -5,25 +5,7 @@ const multer = require("multer");
 const router = express.Router();
 const MAX_SESSIONS = 30;
 
-const announcements = [
-  {
-    author: "CCS Admin",
-    date: "2026-Feb-11",
-    body: "Please keep your reservation details updated before your scheduled laboratory use.",
-  },
-  {
-    author: "CCS Admin",
-    date: "2024-May-08",
-    body: "Important Announcement: We are excited to announce the launch of our new website. Explore our latest products and services now!",
-  },
-];
-
-const rules = [
-  "Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans, and other personal pieces of equipment must be switched off.",
-  "Games are not allowed inside the lab. This includes computer-related games, card games, and other games that may disturb the operation of the lab.",
-  "Surfing the internet is allowed only with the permission of the instructor. Downloading and installing software are strictly prohibited unless authorized.",
-  "Observe cleanliness and proper use of all laboratory equipment at all times.",
-];
+const { announcements, rules } = require("../dashboardContent");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -135,15 +117,20 @@ router.get("/", requireAuth, async (req, res) => {
 
     if (user) refreshSessionUser(req, user);
 
+    const activeRecords = records.filter((record) => record.status === "Active");
+    const recentRecords = records.slice(0, 10);
+    const recentReservations = reservations.slice(0, 10);
+    const pendingReservationItems = reservations.filter(
+      (item) => item.status === "Pending"
+    );
+
     const completedSessions = records.filter(
       (record) => record.status === "Completed",
     ).length;
     const activeSessions = records.filter(
       (record) => record.status === "Active",
     ).length;
-    const pendingReservations = reservations.filter(
-      (item) => item.status === "Pending",
-    ).length;
+    const pendingReservations = pendingReservationItems.length;
 
     res.render("dashboard/index", {
       title: "Dashboard",
@@ -152,6 +139,9 @@ router.get("/", requireAuth, async (req, res) => {
       rules,
       records,
       reservations,
+      activeRecords,
+      recentRecords,
+      recentReservations,
       activeSessions,
       completedSessions,
       remainingSessions: Math.max(0, MAX_SESSIONS - completedSessions),
@@ -320,10 +310,11 @@ router.post(
 router.post("/time-in", requireAuth, (req, res) => {
   const { lab_room, purpose } = req.body;
   const userId = req.session.user.id;
+  const returnTo = req.query.returnTo || "/dashboard/history";
 
   if (!lab_room || !purpose) {
     req.session.error = "Lab room and purpose are required.";
-    return res.redirect("/dashboard");
+    return res.redirect(returnTo);
   }
 
   db.get(
@@ -332,7 +323,7 @@ router.post("/time-in", requireAuth, (req, res) => {
     (err, row) => {
       if (row) {
         req.session.error = "You already have an active sit-in session.";
-        return res.redirect("/dashboard");
+        return res.redirect(returnTo);
       }
 
       db.run(
@@ -340,7 +331,7 @@ router.post("/time-in", requireAuth, (req, res) => {
         [userId, lab_room, purpose],
         () => {
           req.session.message = "Time-in recorded successfully.";
-          res.redirect("/dashboard/history");
+          res.redirect(returnTo);
         },
       );
     },
@@ -350,6 +341,7 @@ router.post("/time-in", requireAuth, (req, res) => {
 router.post("/time-out/:id", requireAuth, (req, res) => {
   const recordId = req.params.id;
   const userId = req.session.user.id;
+  const returnTo = req.query.returnTo || "/dashboard/history";
 
   db.run(
     `UPDATE sitin_records
@@ -360,7 +352,7 @@ router.post("/time-out/:id", requireAuth, (req, res) => {
       req.session.message = this.changes
         ? "Time-out recorded successfully."
         : "No active record found.";
-      res.redirect("/dashboard/history");
+      res.redirect(returnTo);
     },
   );
 });
