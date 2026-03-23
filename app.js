@@ -38,8 +38,10 @@ app.use((req, res, next) => {
   res.locals.path = req.path;
   res.locals.message = req.session.message || null;
   res.locals.error = req.session.error || null;
+  res.locals.loginSuccess = req.session.login_success || false;
   delete req.session.message;
   delete req.session.error;
+  delete req.session.login_success;
   next();
 });
 
