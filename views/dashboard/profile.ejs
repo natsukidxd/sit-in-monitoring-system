@@ -200,7 +200,7 @@
         <div class="col-lg-6 text-center">
           <div class="profile-illustration">
             <div class="profile-device p-4 shadow-sm rounded-4 bg-white d-inline-block">
-              <div class="device-avatar mb-3">
+              <div class="device-avatar mx-auto mt-2 mb-5">
                 <img
                   src="/profile-image/<%= user.image_url %>"
                   alt="Profile Preview"
@@ -213,8 +213,6 @@
                 <%= user.first_name %> <%= user.last_name %>
               </h5>
               <p class="text-muted mb-2"><%= user.email %></p>
-              <div class="device-line"></div>
-              <div class="device-line short"></div>
               <span class="badge bg-primary">
                 <%= user.course || 'No Course' %> - <%= user.course_level || '-' %>
               </span>
