@@ -3,7 +3,6 @@ const path = require("path");
 const { db } = require("../db");
 const multer = require("multer");
 const router = express.Router();
-const MAX_SESSIONS = 30;
 
 const { announcements, rules } = require("../dashboardContent");
 
@@ -67,6 +66,7 @@ function refreshSessionUser(req, user) {
     course_level: user.course_level,
     address: user.address,
     image_url: user.image_url || "/images/profiles/default.png",
+    sessions_left: user.sessions_left ?? 30,
   };
 }
 
@@ -82,7 +82,18 @@ function getUserById(userId) {
 function getRecords(userId) {
   return new Promise((resolve, reject) => {
     db.all(
-      `SELECT * FROM sitin_records WHERE user_id = ? ORDER BY time_in DESC`,
+      `
+        SELECT
+          sr.*,
+          sf.id AS feedback_id,
+          sf.rating AS feedback_rating,
+          sf.comments AS feedback_comments,
+          sf.created_at AS feedback_created_at
+        FROM sitin_records sr
+        LEFT JOIN sitin_feedback sf ON sf.sitin_record_id = sr.id
+        WHERE sr.user_id = ?
+        ORDER BY sr.time_in DESC
+      `,
       [userId],
       (err, rows) => {
         if (err) return reject(err);
@@ -109,43 +120,16 @@ router.get("/", requireAuth, async (req, res) => {
   const userId = req.session.user.id;
 
   try {
-    const [user, records, reservations] = await Promise.all([
-      getUserById(userId),
-      getRecords(userId),
-      getReservations(userId),
-    ]);
+    const user = await getUserById(userId);
 
     if (user) refreshSessionUser(req, user);
-
-    const activeRecords = records.filter((record) => record.status === "Active");
-    const recentRecords = records.slice(0, 10);
-    const recentReservations = reservations.slice(0, 10);
-    const pendingReservationItems = reservations.filter(
-      (item) => item.status === "Pending"
-    );
-
-    const completedSessions = records.filter(
-      (record) => record.status === "Completed",
-    ).length;
-    const activeSessions = records.filter(
-      (record) => record.status === "Active",
-    ).length;
-    const pendingReservations = pendingReservationItems.length;
 
     res.render("dashboard/index", {
       title: "Dashboard",
       user,
       announcements,
       rules,
-      records,
-      reservations,
-      activeRecords,
-      recentRecords,
-      recentReservations,
-      activeSessions,
-      completedSessions,
-      remainingSessions: Math.max(0, MAX_SESSIONS - completedSessions),
-      pendingReservations,
+      remainingSessions: Math.max(0, Number(user?.sessions_left ?? 30)),
     });
   } catch (error) {
     console.error(error);
@@ -170,23 +154,18 @@ router.get("/history", requireAuth, async (req, res) => {
 
 router.get("/reservation", requireAuth, async (req, res) => {
   try {
-    const [user, reservations, records] = await Promise.all([
+    const [user, reservations] = await Promise.all([
       getUserById(req.session.user.id),
       getReservations(req.session.user.id),
-      getRecords(req.session.user.id),
     ]);
 
     if (user) refreshSessionUser(req, user);
-
-    const completedSessions = records.filter(
-      (record) => record.status === "Completed",
-    ).length;
 
     res.render("dashboard/reservation", {
       title: "Reservation",
       user,
       reservations,
-      remainingSessions: Math.max(0, MAX_SESSIONS - completedSessions),
+      remainingSessions: Math.max(0, Number(user?.sessions_left ?? 30)),
     });
   } catch (error) {
     console.error(error);
@@ -307,37 +286,6 @@ router.post(
   },
 );
 
-router.post("/time-in", requireAuth, (req, res) => {
-  const { lab_room, purpose } = req.body;
-  const userId = req.session.user.id;
-  const returnTo = req.query.returnTo || "/dashboard/history";
-
-  if (!lab_room || !purpose) {
-    req.session.error = "Lab room and purpose are required.";
-    return res.redirect(returnTo);
-  }
-
-  db.get(
-    `SELECT id FROM sitin_records WHERE user_id = ? AND status = 'Active' LIMIT 1`,
-    [userId],
-    (err, row) => {
-      if (row) {
-        req.session.error = "You already have an active sit-in session.";
-        return res.redirect(returnTo);
-      }
-
-      db.run(
-        `INSERT INTO sitin_records (user_id, lab_room, purpose) VALUES (?, ?, ?)`,
-        [userId, lab_room, purpose],
-        () => {
-          req.session.message = "Time-in recorded successfully.";
-          res.redirect(returnTo);
-        },
-      );
-    },
-  );
-});
-
 router.post("/time-out/:id", requireAuth, (req, res) => {
   const recordId = req.params.id;
   const userId = req.session.user.id;
@@ -354,6 +302,66 @@ router.post("/time-out/:id", requireAuth, (req, res) => {
         : "No active record found.";
       res.redirect(returnTo);
     },
+  );
+});
+
+router.post("/feedback/:recordId", requireAuth, (req, res) => {
+  const recordId = req.params.recordId;
+  const userId = req.session.user.id;
+  const rating = Number.parseInt(String(req.body.rating || ""), 10);
+  const comments = String(req.body.comments || "").trim();
+
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    req.session.error = "Please select a rating from 1 to 5.";
+    return res.redirect("/dashboard/history");
+  }
+
+  db.get(
+    `SELECT id, status FROM sitin_records WHERE id = ? AND user_id = ?`,
+    [recordId, userId],
+    (recordErr, record) => {
+      if (recordErr || !record) {
+        req.session.error = "Sit-in record not found.";
+        return res.redirect("/dashboard/history");
+      }
+
+      if (record.status !== "Completed") {
+        req.session.error = "You can only submit feedback for completed sit-ins.";
+        return res.redirect("/dashboard/history");
+      }
+
+      db.get(
+        `SELECT id FROM sitin_feedback WHERE sitin_record_id = ? LIMIT 1`,
+        [recordId],
+        (existingErr, existing) => {
+          if (existingErr) {
+            console.error(existingErr);
+            req.session.error = "Unable to submit feedback.";
+            return res.redirect("/dashboard/history");
+          }
+
+          if (existing) {
+            req.session.error = "Feedback was already submitted for this sit-in.";
+            return res.redirect("/dashboard/history");
+          }
+
+          db.run(
+            `INSERT INTO sitin_feedback (sitin_record_id, user_id, rating, comments) VALUES (?, ?, ?, ?)`,
+            [recordId, userId, rating, comments],
+            function (insertErr) {
+              if (insertErr) {
+                console.error(insertErr);
+                req.session.error = "Unable to submit feedback.";
+                return res.redirect("/dashboard/history");
+              }
+
+              req.session.message = "Thank you! Your feedback has been submitted.";
+              res.redirect("/dashboard/history");
+            }
+          );
+        }
+      );
+    }
   );
 });
 
