@@ -1,0 +1,49 @@
+<section class="py-3 py-lg-4">
+  <div class="container-fluid px-lg-3">
+    <div class="panel-card">
+      <div class="panel-header">Student Sit-in Feedback</div>
+      <div class="panel-body table-responsive">
+        <table class="table table-bordered align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Submitted</th>
+              <th>ID Number</th>
+              <th>Name</th>
+              <th>Course</th>
+              <th>Year</th>
+              <th>Lab</th>
+              <th>Purpose</th>
+              <th>Rating</th>
+              <th>Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!feedback || !feedback.length) { %>
+            <tr>
+              <td colspan="9" class="text-center py-4 text-muted">No feedback submitted yet.</td>
+            </tr>
+            <% } %>
+
+            <% (feedback || []).forEach(item => { %>
+            <tr>
+              <td><%= item.created_at ? new Date(item.created_at).toLocaleString() : '-' %></td>
+              <td><%= item.id_number %></td>
+              <td><%= item.first_name %> <%= item.last_name %></td>
+              <td><%= item.course || '-' %></td>
+              <td><%= item.course_level || '-' %></td>
+              <td><%= item.lab_room || '-' %></td>
+              <td><%= item.purpose || '-' %></td>
+              <td>
+                <span class="badge bg-primary"><%= item.rating %> / 5</span>
+              </td>
+              <td style="min-width: 320px;">
+                <%= item.comments || '—' %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
