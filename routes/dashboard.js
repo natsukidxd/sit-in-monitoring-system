@@ -4,7 +4,7 @@ const { db } = require("../db");
 const multer = require("multer");
 const router = express.Router();
 
-const { announcements, rules } = require("../dashboardContent");
+const { rules } = require("../dashboardContent");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -116,11 +116,40 @@ function getReservations(userId) {
   });
 }
 
+function getAnnouncements(limit = 10) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `
+        SELECT id, author, body, created_at
+        FROM announcements
+        ORDER BY created_at DESC
+        LIMIT ?
+      `,
+      [limit],
+      (err, rows) => {
+        if (err) return reject(err);
+        const mapped = (rows || []).map((item) => ({
+          id: item.id,
+          author: item.author,
+          body: item.body,
+          date: item.created_at
+            ? new Date(item.created_at).toLocaleDateString()
+            : "-",
+        }));
+        resolve(mapped);
+      }
+    );
+  });
+}
+
 router.get("/", requireAuth, async (req, res) => {
   const userId = req.session.user.id;
 
   try {
-    const user = await getUserById(userId);
+    const [user, announcements] = await Promise.all([
+      getUserById(userId),
+      getAnnouncements(10),
+    ]);
 
     if (user) refreshSessionUser(req, user);
 
