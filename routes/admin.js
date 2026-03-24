@@ -1,6 +1,6 @@
 const express = require("express");
 const { db } = require("../db");
-const { announcements, rules } = require("../dashboardContent");
+const { rules } = require("../dashboardContent");
 const PDFDocument = require("pdfkit");
 
 const router = express.Router();
@@ -116,6 +116,32 @@ function buildReportWhere(filters) {
   }
 
   return { whereClause: clauses.join(" AND "), params };
+}
+
+function getAnnouncements(limit = 10) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `
+        SELECT id, author, body, created_at
+        FROM announcements
+        ORDER BY created_at DESC
+        LIMIT ?
+      `,
+      [limit],
+      (err, rows) => {
+        if (err) return reject(err);
+        const mapped = (rows || []).map((item) => ({
+          id: item.id,
+          author: item.author,
+          body: item.body,
+          date: item.created_at
+            ? new Date(item.created_at).toLocaleDateString()
+            : "-",
+        }));
+        resolve(mapped);
+      }
+    );
+  });
 }
 
 router.get("/", requireAdmin, async (req, res) => {
@@ -241,7 +267,6 @@ router.get("/", requireAdmin, async (req, res) => {
       recentRecords,
       pendingReservations,
       users,
-      announcements,
       rules,
     });
   } catch (error) {
@@ -249,6 +274,90 @@ router.get("/", requireAdmin, async (req, res) => {
     req.session.error = "Unable to load admin dashboard.";
     res.redirect("/dashboard");
   }
+});
+
+router.post("/announcements", requireAdmin, (req, res) => {
+  const body = String(req.body.body || "").trim();
+  const author = req.session.user?.name || "CCS Admin";
+  const returnTo = String(req.body.returnTo || "/admin/announcements");
+
+  if (!body) {
+    req.session.error = "Announcement message is required.";
+    return res.redirect(returnTo);
+  }
+
+  db.run(
+    `INSERT INTO announcements (author, body) VALUES (?, ?)`,
+    [author, body],
+    function (err) {
+      if (err) {
+        console.error(err);
+        req.session.error = "Unable to post announcement.";
+        return res.redirect(returnTo);
+      }
+      req.session.message = "Announcement posted successfully.";
+      res.redirect(returnTo);
+    }
+  );
+});
+
+router.get("/announcements", requireAdmin, async (req, res) => {
+  try {
+    const announcements = await getAnnouncements(200);
+    res.render("admin/announcements", {
+      title: "Manage Announcements",
+      announcements,
+    });
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to load announcements.";
+    res.redirect("/admin");
+  }
+});
+
+router.post("/announcements/:id/edit", requireAdmin, (req, res) => {
+  const announcementId = req.params.id;
+  const body = String(req.body.body || "").trim();
+
+  if (!body) {
+    req.session.error = "Announcement message is required.";
+    return res.redirect("/admin/announcements");
+  }
+
+  db.run(
+    `UPDATE announcements SET body = ? WHERE id = ?`,
+    [body, announcementId],
+    function (err) {
+      if (err) {
+        console.error(err);
+        req.session.error = "Unable to update announcement.";
+        return res.redirect("/admin/announcements");
+      }
+      req.session.message = this.changes
+        ? "Announcement updated successfully."
+        : "Announcement not found.";
+      res.redirect("/admin/announcements");
+    }
+  );
+});
+
+router.post("/announcements/:id/delete", requireAdmin, (req, res) => {
+  const announcementId = req.params.id;
+  db.run(
+    `DELETE FROM announcements WHERE id = ?`,
+    [announcementId],
+    function (err) {
+      if (err) {
+        console.error(err);
+        req.session.error = "Unable to delete announcement.";
+        return res.redirect("/admin/announcements");
+      }
+      req.session.message = this.changes
+        ? "Announcement deleted successfully."
+        : "Announcement not found.";
+      res.redirect("/admin/announcements");
+    }
+  );
 });
 
 function statsPercent(value, total) {
