@@ -1,0 +1,96 @@
+<section class="py-3 py-lg-4">
+  <div class="container-fluid px-lg-3">
+    <div class="row g-3">
+      <div class="col-xl-4">
+        <div class="panel-card h-100">
+          <div class="panel-header">Create Announcement</div>
+          <div class="panel-body">
+            <form action="/admin/announcements" method="POST" class="row g-3">
+              <input type="hidden" name="returnTo" value="/admin/announcements" />
+              <div class="col-12">
+                <label class="form-label fw-semibold">Message</label>
+                <textarea
+                  name="body"
+                  class="form-control"
+                  rows="6" q
+                  placeholder="Write an announcement for students..."
+                  required
+                ></textarea>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-primary w-100">Post Announcement</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-8">
+        <div class="panel-card h-100">
+          <div class="panel-header">Manage Announcements</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Author</th>
+                  <th>Message</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!announcements || !announcements.length) { %>
+                  <tr>
+                    <td colspan="4" class="text-center py-4 text-muted">No announcements found.</td>
+                  </tr>
+                <% } %>
+
+                <% (announcements || []).forEach(item => { %>
+                  <tr>
+                    <td><%= item.date %></td>
+                    <td><%= item.author %></td>
+                    <td style="min-width: 320px;"><%= item.body %></td>
+                    <td class="d-flex gap-2">
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#editAnnouncementModal-<%= item.id %>"
+                      >
+                        Edit
+                      </button>
+                      <form action="/admin/announcements/<%= item.id %>/delete" method="POST" onsubmit="return confirm('Delete this announcement?');">
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+
+                  <div class="modal fade" id="editAnnouncementModal-<%= item.id %>" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                      <div class="modal-content" style="border-radius: 14px; overflow: hidden;">
+                        <div class="modal-header" style="background: linear-gradient(90deg, #124d99, #1e57a2);">
+                          <h5 class="modal-title text-white fw-bold mb-0">Edit Announcement</h5>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form action="/admin/announcements/<%= item.id %>/edit" method="POST">
+                          <div class="modal-body">
+                            <label class="form-label fw-semibold">Message</label>
+                            <textarea name="body" class="form-control" rows="6" required><%= item.body %></textarea>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
