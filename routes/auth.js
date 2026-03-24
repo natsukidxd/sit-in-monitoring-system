@@ -44,6 +44,7 @@ router.post("/login", (req, res) => {
         middle_name: user.middle_name,
         course_level: user.course_level,
         address: user.address,
+        sessions_left: user.sessions_left ?? 30,
       };
 
       req.session.message = `Welcome back, ${user.first_name}!`;
