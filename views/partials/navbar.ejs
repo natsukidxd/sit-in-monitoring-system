@@ -64,9 +64,30 @@
         </li>
         <li class="nav-item">
           <a
-            class="nav-link <%= path === '/admin' ? 'active' : '' %>"
+            class="nav-link <%= path === '/admin/search' ? 'active' : '' %>"
             href="/admin/search"
-            >Search</a
+            >Search Student</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link <%= path === '/admin/student-sitin' ? 'active' : '' %>"
+            href="/admin/student-sitin"
+            >Student Sit-in</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link <%= path === '/admin/reports' ? 'active' : '' %>"
+            href="/admin/reports"
+            >Report</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link <%= path === '/admin/feedback' ? 'active' : '' %>"
+            href="/admin/feedback"
+            >Feedback</a
           >
         </li>
         <% } else { %>
