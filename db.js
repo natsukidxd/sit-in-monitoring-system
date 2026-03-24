@@ -1,6 +1,7 @@
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcryptjs");
+const { announcements: defaultAnnouncements } = require("./dashboardContent");
 
 const dbPath = path.join(__dirname, "data", "sitin.sqlite");
 const db = new sqlite3.Database(dbPath);
@@ -81,6 +82,15 @@ function initializeDatabase() {
     `);
 
     db.run(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        author TEXT NOT NULL,
+        body TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
       CREATE TABLE IF NOT EXISTS sitin_feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sitin_record_id INTEGER NOT NULL UNIQUE,
@@ -122,6 +132,25 @@ function initializeDatabase() {
         }
       },
     );
+
+    db.get(`SELECT COUNT(*) AS total FROM announcements`, [], (countErr, row) => {
+      if (countErr) {
+        console.error(countErr.message);
+        return;
+      }
+
+      if ((row?.total || 0) > 0) return;
+
+      (defaultAnnouncements || []).forEach((item) => {
+        db.run(
+          `INSERT INTO announcements (author, body) VALUES (?, ?)`,
+          [item.author || "CCS Admin", item.body || ""],
+          (insertErr) => {
+            if (insertErr) console.error(insertErr.message);
+          }
+        );
+      });
+    });
   });
 }
 
