@@ -1,0 +1,136 @@
+<section class="py-3 py-lg-4">
+  <div class="container-fluid px-lg-3">
+    <div class="panel-card mb-3">
+      <div class="panel-header">Search Student</div>
+      <div class="panel-body">
+        <form action="/admin/search" method="GET" class="row g-2">
+          <div class="col-md-10">
+            <input
+              type="text"
+              name="q"
+              class="form-control"
+              value="<%= query || '' %>"
+              placeholder="Search by student name or ID number (leave blank to view all)"
+            />
+          </div>
+          <div class="col-md-2 d-grid">
+            <button class="btn btn-primary" type="submit">Search</button>
+          </div>
+        </form>
+
+        <div class="d-flex justify-content-end mt-3">
+          <form id="resetSessionsForm" action="/admin/students/reset-sessions" method="POST" class="m-0">
+            <button id="resetSessionsBtn" class="btn btn-outline-danger" type="button">
+              Reset Sessions Left (All Students)
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-xl-12">
+        <div class="panel-card">
+          <div class="panel-header">Search Results</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>ID Number</th>
+                  <th>Name</th>
+                  <th>Course</th>
+                  <th>Year</th>
+                  <th>Sessions Left</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!results || !results.length) { %>
+                <tr>
+                  <td colspan="7" class="text-center py-4 text-muted">
+                    <%= query ? 'No matching students found.' : 'No students found.' %>
+                  </td>
+                </tr>
+                <% } %>
+
+                <% (results || []).forEach(student => { %>
+                <tr>
+                  <td><%= student.id_number %></td>
+                  <td><%= student.first_name %> <%= student.last_name %></td>
+                  <td><%= student.course || '-' %></td>
+                  <td><%= student.course_level || '-' %></td>
+                  <td><%= (student.sessions_left ?? 30) %></td>
+                  <td>
+                    <span class="badge <%= Number(student.active_sessions) > 0 ? 'bg-success' : 'bg-secondary' %>">
+                      <%= Number(student.active_sessions) > 0 ? 'Active' : 'Idle' %>
+                    </span>
+                  </td>
+                  <td class="d-flex gap-2">
+                    <a href="/admin/students/<%= student.id %>/edit" class="btn btn-sm btn-outline-primary">
+                      Edit
+                    </a>
+                    <form action="/admin/students/<%= student.id %>/delete" method="POST" onsubmit="return confirm('Delete this student permanently? This will also delete related sit-in and reservation records.');">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="toast-container position-fixed top-50 start-50 translate-middle p-3" style="z-index: 1080;">
+  <div
+    id="resetSessionsToast"
+    class="toast bg-white border shadow-lg"
+    role="alert"
+    aria-live="assertive"
+    aria-atomic="true"
+    style="opacity: 1;"
+  >
+    <div class="toast-header bg-white">
+      <strong class="me-auto">Confirm Reset</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body bg-white">
+      <div class="mb-2">
+        This will reset <strong>sessions left</strong> to <strong>30</strong> for <strong>all students</strong>.
+        Continue?
+      </div>
+      <div class="d-flex gap-2 justify-content-end">
+        <button id="cancelResetSessions" type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="toast">
+          Cancel
+        </button>
+        <button id="confirmResetSessions" type="button" class="btn btn-sm btn-danger">
+          Yes, Reset
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var triggerBtn = document.getElementById("resetSessionsBtn");
+    var toastEl = document.getElementById("resetSessionsToast");
+    var confirmBtn = document.getElementById("confirmResetSessions");
+    var form = document.getElementById("resetSessionsForm");
+    if (!triggerBtn || !toastEl || !confirmBtn || !form) return;
+
+    triggerBtn.addEventListener("click", function () {
+      if (!window.bootstrap || !window.bootstrap.Toast) return;
+      var toast = window.bootstrap.Toast.getOrCreateInstance(toastEl, { autohide: false });
+      toast.show();
+    });
+
+    confirmBtn.addEventListener("click", function () {
+      form.submit();
+    });
+  })();
+</script>
