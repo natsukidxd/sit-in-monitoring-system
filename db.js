@@ -15,15 +15,44 @@ function initializeDatabase() {
         last_name TEXT NOT NULL,
         middle_name TEXT,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
         course TEXT,
         course_level TEXT,
         address TEXT,
         role TEXT DEFAULT 'student',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        image_url TEXT DEFAULT '/images/profiles/default.png'
+        image_url TEXT DEFAULT 'default.png',
+        sessions_left INTEGER NOT NULL DEFAULT 30
       )
     `);
+
+    // Lightweight migration for older databases (already created without sessions_left).
+    db.all(`PRAGMA table_info(users)`, [], (err, columns) => {
+      if (err) {
+        console.error(err.message);
+        return;
+      }
+
+      const hasSessionsLeft = (columns || []).some(
+        (col) => col?.name === "sessions_left"
+      );
+      if (!hasSessionsLeft) {
+        db.run(
+          `ALTER TABLE users ADD COLUMN sessions_left INTEGER NOT NULL DEFAULT 30`,
+          (alterErr) => {
+            if (alterErr) console.error(alterErr.message);
+          }
+        );
+      }
+
+      // Ensure any legacy rows have a valid value.
+      db.run(
+        `UPDATE users SET sessions_left = 30 WHERE sessions_left IS NULL`,
+        (updateErr) => {
+          if (updateErr) console.error(updateErr.message);
+        }
+      );
+    });
 
     db.run(`
       CREATE TABLE IF NOT EXISTS sitin_records (
@@ -51,6 +80,19 @@ function initializeDatabase() {
       )
     `);
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS sitin_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sitin_record_id INTEGER NOT NULL UNIQUE,
+        user_id INTEGER NOT NULL,
+        rating INTEGER NOT NULL,
+        comments TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sitin_record_id) REFERENCES sitin_records(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+
     db.get(
       `SELECT id FROM users WHERE role = 'admin' LIMIT 1`,
       async (err, row) => {
@@ -61,8 +103,8 @@ function initializeDatabase() {
         if (!row) {
           const passwordHash = await bcrypt.hash("admin123", 10);
           db.run(
-            `INSERT INTO users (id_number, last_name, first_name, middle_name, course_level, email, course, address, password_hash, role)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO users (id_number, last_name, first_name, middle_name, course_level, email, course, address, password_hash, role, sessions_left)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               "1",
               "Administrator",
@@ -74,6 +116,7 @@ function initializeDatabase() {
               "CCS Office",
               passwordHash,
               "admin",
+              30,
             ],
           );
         }
