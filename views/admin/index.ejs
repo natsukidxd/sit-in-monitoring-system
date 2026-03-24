@@ -35,78 +35,112 @@
         </div>
       </div>
 
-      <div class="col-xl-4">
+      <div class="col-xl-9">
         <div class="panel-card h-100">
-          <div class="panel-header d-flex align-items-center gap-2">
-            <i class="bi bi-megaphone-fill"></i> Announcement
+          <div class="panel-header d-flex align-items-center justify-content-between">
+            <span>Laboratory Usage by Course</span>
+            <span class="text small"><%= stats.totalCoursesUsingLab %> courses</span>
           </div>
-          <div class="panel-body panel-scroll">
-            <% announcements.forEach((item, index) => { %>
-            <div
-              class="announcement-item <%= index !== announcements.length - 1 ? 'with-border' : '' %>"
-            >
-              <h5><%= item.author %> | <%= item.date %></h5>
-              <div class="announcement-box"><%= item.body %></div>
+          <div class="panel-body">
+            <% if (!courseUsage.length) { %>
+            <div class="alert alert-secondary mb-0">
+              No sit-in records yet. Course usage chart will appear once students start using the lab.
             </div>
-            <% }) %>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-5">
-        <div class="panel-card h-100">
-          <div class="panel-header">Rules and Regulation</div>
-          <div class="panel-body panel-scroll rules-panel">
-            <h2 class="text-center fw-bold mb-2">University of Cebu</h2>
-            <h4 class="text-center fw-bold mb-4">
-              COLLEGE OF INFORMATION &amp; COMPUTER STUDIES
-            </h4>
-            <h5 class="fw-bold mb-4">LABORATORY RULES AND REGULATIONS</h5>
-            <p>
-              To avoid embarrassment and maintain camaraderie with your friends
-              and superiors at our laboratories, please observe the following:
-            </p>
-            <ol class="rules-list">
-              <% rules.forEach(rule => { %>
-              <li><%= rule %></li>
-              <% }) %>
-            </ol>
+            <% } else { %>
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <canvas id="courseUsageChart" height="260"></canvas>
+              </div>
+              <div class="col-lg-6">
+                <div class="table-responsive">
+                  <table class="table table-bordered align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Course</th>
+                        <th>Sessions</th>
+                        <th>Share</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% courseUsage.forEach(item => { %>
+                      <tr>
+                        <td><%= item.course %></td>
+                        <td><%= item.usageCount %></td>
+                        <td><%= item.percent %>%</td>
+                      </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <% } %>
           </div>
         </div>
       </div>
     </div>
 
     <div class="row g-3 mt-1">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <div class="summary-card">
           <span>Total Students</span>
           <strong><%= stats.totalStudents %></strong>
         </div>
       </div>
 
-      <div class="col-md-4">
-        <div class="summary-card">
-          <span>Total Admins</span>
-          <strong><%= stats.totalAdmins %></strong>
-        </div>
-      </div>
-
-      <div class="col-md-4">
+      <div class="col-md-3">
         <div class="summary-card">
           <span>Active Sit-ins</span>
           <strong><%= stats.activeSitins %></strong>
         </div>
       </div>
+
+      <div class="col-md-3">
+        <div class="summary-card">
+          <span>Utilization Rate</span>
+          <strong><%= stats.utilizationRate %>%</strong>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="summary-card">
+          <span>Courses Using Lab</span>
+          <strong><%= stats.totalCoursesUsingLab %></strong>
+        </div>
+      </div>
     </div>
 
     <div class="row g-3 mt-1">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <div class="summary-card">
           <span>Completed Sit-ins</span>
           <strong><%= stats.completedSitins %></strong>
         </div>
       </div>
 
+      <div class="col-md-3">
+        <div class="summary-card">
+          <span>Today's Sit-ins</span>
+          <strong><%= stats.todaySitins %></strong>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="summary-card">
+          <span>This Week Sit-ins</span>
+          <strong><%= stats.thisWeekSitins %></strong>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="summary-card">
+          <span>Labs Used</span>
+          <strong><%= stats.uniqueLabsUsed %></strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mt-1">
       <div class="col-md-4">
         <div class="summary-card">
           <span>Pending Reservations</span>
@@ -118,6 +152,13 @@
         <div class="summary-card">
           <span>Total Reservations</span>
           <strong><%= stats.totalReservations %></strong>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="summary-card">
+          <span>Total Admins</span>
+          <strong><%= stats.totalAdmins %></strong>
         </div>
       </div>
     </div>
@@ -291,3 +332,65 @@
     </div>
   </div>
 </section>
+
+<% if (courseUsage && courseUsage.length) { %>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script type="application/json" id="courseUsageChartData">
+  <%- JSON.stringify({
+    labels: courseUsage.map((item) => item.course),
+    values: courseUsage.map((item) => item.usageCount)
+  }) %>
+</script>
+<script>
+  (function () {
+    const canvas = document.getElementById("courseUsageChart");
+    const dataEl = document.getElementById("courseUsageChartData");
+    if (!canvas || !dataEl) return;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(dataEl.textContent || "{}");
+    } catch (e) {
+      return;
+    }
+
+    const labels = Array.isArray(parsed.labels) ? parsed.labels : [];
+    const values = Array.isArray(parsed.values) ? parsed.values : [];
+    if (!labels.length || !values.length) return;
+
+    const colors = [
+      "#124d99",
+      "#1e57a2",
+      "#2f6fc2",
+      "#3b82f6",
+      "#60a5fa",
+      "#93c5fd",
+      "#f59e0b",
+      "#10b981",
+      "#ef4444",
+      "#8b5cf6",
+    ];
+
+    new Chart(canvas, {
+      type: "pie",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: labels.map((_, index) => colors[index % colors.length]),
+            borderColor: "#ffffff",
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom" },
+        },
+      },
+    });
+  })();
+</script>
+<% } %>
