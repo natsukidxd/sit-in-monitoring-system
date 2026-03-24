@@ -1,0 +1,148 @@
+<section class="py-3 py-lg-4">
+  <div class="container-fluid px-lg-3">
+    <div class="panel-card mb-3">
+      <div class="panel-header">Student Sit-in</div>
+      <div class="panel-body">
+        <form action="/admin/student-sitin" method="GET" class="row g-2">
+          <div class="col-md-10">
+            <input
+              type="text"
+              name="q"
+              class="form-control"
+              value="<%= query || '' %>"
+              placeholder="Search by student name or ID number"
+              required
+            />
+          </div>
+          <div class="col-md-2 d-grid">
+            <button class="btn btn-primary" type="submit">Search</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-xl-8">
+        <div class="panel-card">
+          <div class="panel-header">Search Results</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>ID Number</th>
+                  <th>Name</th>
+                  <th>Course</th>
+                  <th>Year</th>
+                  <th>Used Sessions</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!results || !results.length) { %>
+                <tr>
+                  <td colspan="6" class="text-center py-4 text-muted">
+                    <%= query ? 'No matching students found.' : 'Search for a student to see results.' %>
+                  </td>
+                </tr>
+                <% } %>
+
+                <% (results || []).forEach(student => { %>
+                <tr>
+                  <td><%= student.id_number %></td>
+                  <td><%= student.first_name %> <%= student.last_name %></td>
+                  <td><%= student.course || '-' %></td>
+                  <td><%= student.course_level || '-' %></td>
+                  <td><%= student.used_sessions || 0 %></td>
+                  <td>
+                    <span class="badge <%= Number(student.active_sessions) > 0 ? 'bg-success' : 'bg-secondary' %>">
+                      <%= Number(student.active_sessions) > 0 ? 'Active' : 'Idle' %>
+                    </span>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="panel-card h-100">
+          <div class="panel-header">Admin Time In (Student)</div>
+          <div class="panel-body">
+            <% if (!selectedStudent) { %>
+            <div class="alert alert-info mb-0">
+              Search and select a student first. The top result is prepared for quick time-in.
+            </div>
+            <% } else { %>
+              <% if (Number(selectedStudent.active_sessions) > 0) { %>
+                <div class="col-12">
+                  <label class="form-label fw-semibold">Student</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    value="<%= selectedStudent.id_number %> - <%= selectedStudent.first_name %> <%= selectedStudent.last_name %>"
+                    readonly
+                  />
+                </div>
+
+                <div class="alert alert-warning py-2 mt-3 mb-3">
+                  This student already has an active sit-in session.
+                </div>
+
+                <form action="/admin/student-sitin/time-out" method="POST">
+                  <input type="hidden" name="query" value="<%= query %>" />
+                  <input type="hidden" name="student_id" value="<%= selectedStudent.id %>" />
+                  <button class="btn btn-danger w-100" type="submit">
+                    Time Out Student
+                  </button>
+                </form>
+              <% } else { %>
+                <form action="/admin/student-sitin/time-in" method="POST" class="row g-3">
+                  <input type="hidden" name="query" value="<%= query %>" />
+                  <input type="hidden" name="student_id" value="<%= selectedStudent.id %>" />
+
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Student</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      value="<%= selectedStudent.id_number %> - <%= selectedStudent.first_name %> <%= selectedStudent.last_name %>"
+                      readonly
+                    />
+                  </div>
+
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Lab Room</label>
+                    <select name="lab_room" class="form-select" required>
+                      <option value="" disabled selected>Select laboratory</option>
+                      <option value="524">524</option>
+                      <option value="526">526</option>
+                      <option value="528">528</option>
+                      <option value="Networking Lab">Networking Lab</option>
+                    </select>
+                  </div>
+
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Purpose</label>
+                    <textarea
+                      name="purpose"
+                      class="form-control"
+                      rows="4"
+                      placeholder="Ex. Programming activity, research, project work"
+                      required
+                    ></textarea>
+                  </div>
+
+                  <div class="col-12">
+                    <button class="btn btn-primary w-100" type="submit">Record Time In</button>
+                  </div>
+                </form>
+              <% } %>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
