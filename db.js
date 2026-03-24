@@ -20,8 +20,8 @@ function initializeDatabase() {
         course_level TEXT,
         address TEXT,
         role TEXT DEFAULT 'student',
-        image_url TEXT DEFAULT '/images/profiles/default.png',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        image_url TEXT DEFAULT '/images/profiles/default.png'
       )
     `);
 

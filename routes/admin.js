@@ -208,4 +208,16 @@ router.post("/records/:id/timeout", requireAdmin, (req, res) => {
   );
 });
 
+router.get("/search", requireAdmin, (req, res) => {
+
+  try {
+    res.sender("admin/search", {
+      title: "Search",
+
+    })
+  } catch (error) {
+    res.redirect("/admin")
+  }
+});
+
 module.exports = router;

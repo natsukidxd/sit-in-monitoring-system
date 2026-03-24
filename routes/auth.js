@@ -14,7 +14,7 @@ router.post("/login", (req, res) => {
 
   db.get(
     `SELECT * FROM users WHERE id_number = ?`,
-    [id_number],
+    [id_number.toString().toUpperCase()],
     async (err, user) => {
       if (err) {
         req.session.error = "An unexpected error occurred.";
