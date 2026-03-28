@@ -470,7 +470,7 @@ router.get("/search", requireAdmin, (req, res) => {
         }
 
         res.render("admin/search", {
-          title: "Search Student",
+          title: "Students Information",
           query: searchTerm,
           results: rows || [],
         });
@@ -480,6 +480,67 @@ router.get("/search", requireAdmin, (req, res) => {
     console.error(error);
     req.session.error = "Unable to open student search.";
     res.redirect("/admin");
+  }
+});
+
+// JSON endpoint used by the admin search modal (Bootstrap navbar).
+// It returns matching students so the modal can show a single "Sit-in" redirect.
+router.get("/student-sitin/search", requireAdmin, (req, res) => {
+  try {
+    const searchTerm = (req.query.q || "").trim();
+
+    const searchSql = `
+      SELECT
+        u.id,
+        u.id_number,
+        u.first_name,
+        u.last_name,
+        u.course,
+        u.course_level,
+        COALESCE(u.sessions_left, 30) AS sessions_left,
+        (
+          SELECT COUNT(*)
+          FROM sitin_records sr
+          WHERE sr.user_id = u.id AND sr.status = 'Active'
+        ) AS active_sessions
+      FROM users u
+      WHERE u.role = 'student'
+        AND (
+          ? = ''
+          OR u.id_number LIKE ?
+          OR (u.first_name || ' ' || u.last_name) LIKE ?
+          OR (u.last_name || ' ' || u.first_name) LIKE ?
+        )
+      ORDER BY u.last_name ASC, u.first_name ASC
+      LIMIT 25
+    `;
+
+    const likeQuery = `%${searchTerm}%`;
+    db.all(
+      searchSql,
+      [searchTerm, likeQuery, likeQuery, likeQuery],
+      (err, rows) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({
+            ok: false,
+            error: "Unable to search student records.",
+          });
+        }
+
+        res.json({
+          ok: true,
+          query: searchTerm,
+          results: rows || [],
+        });
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ok: false,
+      error: "Unable to open student search.",
+    });
   }
 });
 
@@ -863,6 +924,10 @@ router.post("/students/reset-sessions", requireAdmin, (req, res) => {
     }
   );
 });
+
+router.post("/students/add", requireAdmin, (req, res) => {
+  
+})
 
 router.get("/feedback", requireAdmin, (req, res) => {
   db.all(

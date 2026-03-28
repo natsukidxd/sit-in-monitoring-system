@@ -2,7 +2,7 @@
   <div class="container-fluid px-lg-3">
     <a
       class="navbar-brand fw-semibold"
-      href="<%= currentUser ? '/dashboard' : '/' %>"
+      href="<%= currentUser ? currentUser.role == 'admin' ? '/admin' : '/dashboard': '/' %>"
       >Dashboard</a
     >
     <button
@@ -57,23 +57,28 @@
         <% if (currentUser.role === 'admin') { %>
         <li class="nav-item">
           <a
-            class="nav-link <%= path === '/admin' ? 'active' : '' %>"
-            href="/admin"
-            >Admin Dashboard</a
+            id="adminStudentSearchNavLink"
+            class="nav-link"
+            href="#"
+            role="button"
+            data-bs-toggle="modal"
+            data-bs-target="#adminStudentSearchModal"
           >
+            Search
+          </a>
         </li>
         <li class="nav-item">
           <a
             class="nav-link <%= path === '/admin/search' ? 'active' : '' %>"
             href="/admin/search"
-            >Search Student</a
+            >Students</a
           >
         </li>
         <li class="nav-item">
           <a
             class="nav-link <%= path === '/admin/student-sitin' ? 'active' : '' %>"
             href="/admin/student-sitin"
-            >Student Sit-in</a
+            >Sit-in</a
           >
         </li>
         <li class="nav-item">
@@ -143,3 +148,302 @@
     </div>
   </div>
 </nav>
+<% if (currentUser && currentUser.role === 'admin') { %>
+  <div
+  class="modal fade"
+  id="adminStudentAddModal"
+  tabindex="-1"
+  aria-labelledby="adminStudentAddModalLabel"
+  aria-hidden="true"
+  >
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 720px; width: 95vw;">
+      <div class="modal-content" style="border-radius: 14px;">
+        <div class="modal-header">
+          <h5 class="modal-title" id="adminStudentAddModalLabel">Add Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="adminStudentAddForm" class="row g-2" autocomplete="off">
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="id_number"
+                  id="id_number"
+                  placeholder=""
+                  required
+                />
+                <label for="id_number">ID Number</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="last_name"
+                  id="last_name"
+                  placeholder=""
+                  required
+                />
+                <label for="last_name">Last Name</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="first_name"
+                  id="first_name"
+                  placeholder=""
+                  required
+                />
+                <label for="first_name">First Name</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="middle_name"
+                  id="middle_name"
+                  placeholder=""
+                  required
+                />
+                <label for="middle_name">Middle Name</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="address"
+                  id="address"
+                  placeholder=""
+                />
+                <label for="address">Address</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <select name="course" id="course" class="form-select" required>
+                  <option value="" selected hidden disabled></option>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSCS-AI">BSCS-AI</option>
+                </select>
+                <label for="course">Course</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <select
+                  name="course_level"
+                  id="course_level"
+                  class="form-select"
+                  required
+                >
+                  <option value="" selected hidden disabled></option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+                <label for="course_level">Course Level</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="email"
+                  class="form-control"
+                  name="email"
+                  id="email"
+                  placeholder=""
+                />
+                <label for="email">Email</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="form-floating mb-3">
+                <input
+                  type="password"
+                  class="form-control"
+                  name="password"
+                  id="password"
+                  placeholder=""
+                  required
+                />
+                <label for="password">Password</label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Add Student</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div
+    class="modal fade"
+    id="adminStudentSearchModal"
+    tabindex="-1"
+    aria-labelledby="adminStudentSearchModalLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 720px; width: 95vw;">
+      <div class="modal-content" style="border-radius: 14px;">
+        <div class="modal-header">
+          <h5 class="modal-title" id="adminStudentSearchModalLabel">Search Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <form id="adminStudentSearchForm" class="row g-2" autocomplete="off">
+            <div class="col-md-9">
+              <input
+                id="adminStudentSearchInput"
+                type="text"
+                class="form-control"
+                name="q"
+                placeholder="Search by student ID number or name"
+              />
+            </div>
+            <div class="col-md-3 d-grid">
+              <button class="btn btn-primary" type="submit">Search</button>
+            </div>
+          </form>
+
+          <div id="adminStudentSearchResults" class="mt-3"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var navLink = document.getElementById("adminStudentSearchNavLink");
+      var form = document.getElementById("adminStudentSearchForm");
+      var input = document.getElementById("adminStudentSearchInput");
+      var resultsEl = document.getElementById("adminStudentSearchResults");
+      if (!navLink || !form || !input || !resultsEl) return;
+
+      navLink.addEventListener("click", function (e) {
+        // Prevent jumping to the top when href="#" is used.
+        e.preventDefault();
+      });
+
+      function setResultsHtml(html) {
+        resultsEl.innerHTML = html;
+      }
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        var q = String(input.value || "").trim();
+        if (!q) {
+          setResultsHtml('<div class="alert alert-info mb-0">Enter a student ID number or name.</div>');
+          return;
+        }
+
+        setResultsHtml(
+          '<div class="d-flex align-items-center gap-2 text-muted"><div class="spinner-border spinner-border-sm" role="status"></div> Searching...</div>'
+        );
+
+        try {
+          var resp = await fetch(
+            "/admin/student-sitin/search?q=" + encodeURIComponent(q),
+            { headers: { Accept: "application/json" } }
+          );
+
+          if (!resp.ok) {
+            setResultsHtml('<div class="alert alert-danger mb-0">Unable to search students.</div>');
+            return;
+          }
+
+          var payload = await resp.json();
+          var results = (payload && payload.results) || [];
+
+          if (!results.length) {
+            setResultsHtml('<div class="alert alert-secondary mb-0">No matching student found.</div>');
+            return;
+          }
+
+          // The modal focuses on a single student for quick sit-in redirect.
+          var student = results[0];
+          var hasActive = Number(student.active_sessions) > 0;
+
+          setResultsHtml(`
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between gap-3">
+                  <div>
+                    <div class="text-muted small">Student</div>
+                    <div class="fs-5 fw-semibold">
+                      ${student.first_name || ""} ${student.last_name || ""}
+                    </div>
+                    <div class="text-muted small mt-1">ID: ${student.id_number || "-"}</div>
+                    <div class="mt-2 text-muted small">
+                      Course: ${student.course || "-"} | Year: ${student.course_level || "-"}
+                    </div>
+                  </div>
+                  <div class="text-end">
+                    <div class="text-muted small">Sessions Left</div>
+                    <div class="fw-semibold">${student.sessions_left ?? 30}</div>
+                    <div class="mt-2">
+                      <span class="badge ${hasActive ? "bg-success" : "bg-secondary"}">
+                        ${hasActive ? "Active" : "Idle"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="alert alert-warning py-2 mt-3 mb-0"
+                  style="display:${hasActive ? "block" : "none"}"
+                >
+                  This student already has an active sit-in. Redirecting will show the appropriate action.
+                </div>
+
+                <div class="d-grid mt-3">
+                  <button
+                    id="adminStudentSitInRedirectBtn"
+                    class="btn btn-primary"
+                    type="button"
+                    data-id-number="${student.id_number || ""}"
+                  >
+                    Sit-in
+                  </button>
+                </div>
+              </div>
+            </div>
+          `);
+
+          var redirectBtn = document.getElementById("adminStudentSitInRedirectBtn");
+          if (redirectBtn) {
+            redirectBtn.addEventListener("click", function () {
+              var idNumber = String(redirectBtn.getAttribute("data-id-number") || "").trim();
+              if (!idNumber) return;
+              window.location.href =
+                "/admin/student-sitin?q=" + encodeURIComponent(idNumber);
+            });
+          }
+        } catch (err) {
+          console.error(err);
+          setResultsHtml('<div class="alert alert-danger mb-0">Unexpected error while searching.</div>');
+        }
+      });
+    })();
+  </script>
+<% } %>

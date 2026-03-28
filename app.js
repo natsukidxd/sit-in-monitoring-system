@@ -16,8 +16,15 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'partials/layout');
 app.use(expressLayouts);
 
-// ❌ REMOVE duplicate static (you had two)
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+  '/vendor/bootstrap',
+  express.static(path.join(__dirname, 'node_modules/bootstrap/dist'))
+);
+app.use(
+  '/vendor/bootstrap-icons',
+  express.static(path.join(__dirname, 'node_modules/bootstrap-icons/font'))
+);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -83,5 +90,5 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://172.19.130.122:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });

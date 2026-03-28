@@ -1,3 +1,6 @@
 {
-    "editor.defaultFormatter": "j69.ejs-beautify"
+    "editor.defaultFormatter": "j69.ejs-beautify",
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    }
 }

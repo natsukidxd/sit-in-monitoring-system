@@ -18,7 +18,10 @@
           </div>
         </form>
 
-        <div class="d-flex justify-content-end mt-3">
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#adminStudentAddModal">
+            Add Student
+          </button>
           <form id="resetSessionsForm" action="/admin/students/reset-sessions" method="POST" class="m-0">
             <button id="resetSessionsBtn" class="btn btn-outline-danger" type="button">
               Reset Sessions Left (All Students)
