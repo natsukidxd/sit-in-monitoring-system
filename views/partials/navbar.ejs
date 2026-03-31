@@ -3,7 +3,7 @@
     <a
       class="navbar-brand fw-semibold"
       href="<%= currentUser ? currentUser.role == 'admin' ? '/admin' : '/dashboard': '/' %>"
-      >Dashboard</a
+      ><%= !currentUser ? '' : 'Dashboard' %></a
     >
     <button
       class="navbar-toggler"
