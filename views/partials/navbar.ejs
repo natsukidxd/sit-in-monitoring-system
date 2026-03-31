@@ -78,14 +78,14 @@
           <a
             class="nav-link <%= path === '/admin/student-sitin' ? 'active' : '' %>"
             href="/admin/student-sitin"
-            >Sit-in</a
+            >Active Sit-in</a
           >
         </li>
         <li class="nav-item">
           <a
             class="nav-link <%= path === '/admin/reports' ? 'active' : '' %>"
             href="/admin/reports"
-            >Sit-in Records</a
+            >Reports</a
           >
         </li>
         <li class="nav-item">
@@ -297,7 +297,7 @@
     aria-labelledby="adminStudentSearchModalLabel"
     aria-hidden="true"
   >
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 720px; width: 95vw;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 1080px; width: 95vw;">
       <div class="modal-content" style="border-radius: 14px;">
         <div class="modal-header">
           <h5 class="modal-title" id="adminStudentSearchModalLabel">Search Student</h5>
@@ -330,12 +330,109 @@
     </div>
   </div>
 
+  <div
+    class="modal fade"
+    id="adminStudentSitInModal"
+    tabindex="-1"
+    aria-labelledby="adminStudentSitInModalLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 720px; width: 95vw;">
+      <div class="modal-content" style="border-radius: 14px;">
+        <div class="modal-header">
+          <h5 class="modal-title" id="adminStudentSitInModalLabel">Record Sit-in</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Student</label>
+            <input
+              id="adminStudentSitInModalStudentDisplay"
+              type="text"
+              class="form-control"
+              value=""
+              readonly
+            />
+          </div>
+
+          <div
+            id="adminStudentSitInModalActiveAlert"
+            class="alert alert-warning py-2 mt-3 mb-3"
+            style="display:none"
+          >
+            This student already has an active sit-in session.
+          </div>
+
+          <form id="adminStudentSitInModalTimeOutForm" action="/admin/student-sitin/time-out" method="POST" style="display:none">
+            <input id="adminStudentSitInModalTimeOutStudentId" type="hidden" name="student_id" value="" />
+            <input id="adminStudentSitInModalTimeOutReturnTo" type="hidden" name="returnTo" value="" />
+            <button class="btn btn-danger w-100" type="submit">Time Out Student</button>
+          </form>
+
+          <form id="adminStudentSitInModalTimeInForm" action="/admin/student-sitin/time-in" method="POST" class="row g-3 mt-0" style="display:none">
+            <input id="adminStudentSitInModalTimeInStudentId" type="hidden" name="student_id" value="" />
+            <input id="adminStudentSitInModalTimeInReturnTo" type="hidden" name="returnTo" value="" />
+
+            <div class="col-12 mt-3">
+              <label class="form-label fw-semibold">Lab Room</label>
+              <select name="lab_room" class="form-select" required>
+                <option value="" disabled selected>Select laboratory</option>
+                <option value="524">524</option>
+                <option value="526">526</option>
+                <option value="528">528</option>
+                <option value="530">530</option>
+                <option value="542">542</option>
+                <option value="Mac">Mac</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Purpose</label>
+              <select name="purpose" class="form-select" required>
+                <option value="" selected disabled>Select purpose</option>
+                <option value="C#">C#</option>
+                <option value="C">C</option>
+                <option value="Java">Java</option>
+                <option value="ASP.NET">ASP.NET</option>
+                <option value="PHP">PHP</option>
+                <option value="Python">Python</option>
+                <option value="JavaScript">JavaScript</option>
+                <option value="TypeScript">TypeScript</option>
+                <option value="Networking">Networking</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <button class="btn btn-primary w-100" type="submit">Record Time In</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function () {
       var navLink = document.getElementById("adminStudentSearchNavLink");
       var form = document.getElementById("adminStudentSearchForm");
       var input = document.getElementById("adminStudentSearchInput");
       var resultsEl = document.getElementById("adminStudentSearchResults");
+      var sitInModalEl = document.getElementById("adminStudentSitInModal");
+      var searchModalEl = document.getElementById("adminStudentSearchModal");
+      var sitInStudentDisplay = document.getElementById("adminStudentSitInModalStudentDisplay");
+      var sitInActiveAlert = document.getElementById("adminStudentSitInModalActiveAlert");
+      var timeInForm = document.getElementById("adminStudentSitInModalTimeInForm");
+      var timeOutForm = document.getElementById("adminStudentSitInModalTimeOutForm");
+      var timeInStudentId = document.getElementById("adminStudentSitInModalTimeInStudentId");
+      var timeOutStudentId = document.getElementById("adminStudentSitInModalTimeOutStudentId");
+      var timeInReturnTo = document.getElementById("adminStudentSitInModalTimeInReturnTo");
+      var timeOutReturnTo = document.getElementById("adminStudentSitInModalTimeOutReturnTo");
+
       if (!navLink || !form || !input || !resultsEl) return;
 
       navLink.addEventListener("click", function (e) {
@@ -360,6 +457,7 @@
       function renderResultsTable(results) {
         var rowsHtml = results
           .map(function (student) {
+            var studentId = String(student.id || "").trim();
             var idNumber = String(student.id_number || "").trim();
             var fullName =
               String(student.first_name || "").trim() +
@@ -385,12 +483,16 @@
                 <td class="text-center">
                   <span class="badge ${badgeClass}">${badgeLabel}</span>
                 </td>
-                <td class="text-end">
+                <td class="text-center">
                   <button
                     class="btn btn-sm btn-primary"
                     type="button"
                     data-action="sit-in"
+                    data-student-id="${escapeHtml(studentId)}"
                     data-id-number="${escapeHtml(idNumber)}"
+                    data-first-name="${escapeHtml(String(student.first_name || "").trim())}"
+                    data-last-name="${escapeHtml(String(student.last_name || "").trim())}"
+                    data-active-sessions="${escapeHtml(Number(student.active_sessions || 0))}"
                     ${idNumber ? "" : "disabled"}
                   >
                     Sit-in
@@ -413,12 +515,12 @@
               <thead>
                 <tr>
                   <th style="width: 120px;">ID Number</th>
-                  <th>Student</th>
-                  <th style="width: 120px;">Course</th>
+                  <th style="width: 240px;">Student</th>
+                  <th style="width: 100px;">Course</th>
                   <th style="width: 60px;" class="text-center">Year</th>
                   <th style="width: 90px;" class="text-center">Sessions</th>
                   <th style="width: 90px;" class="text-center">Status</th>
-                  <th style="width: 90px;" class="text-end">Action</th>
+                  <th style="width: 90px;" class="text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -435,10 +537,58 @@
           : null;
         if (!btn) return;
 
+        var studentId = String(btn.getAttribute("data-student-id") || "").trim();
         var idNumber = String(btn.getAttribute("data-id-number") || "").trim();
-        if (!idNumber) return;
-        window.location.href =
-          "/admin/student-sitin?q=" + encodeURIComponent(idNumber);
+        var firstName = String(btn.getAttribute("data-first-name") || "").trim();
+        var lastName = String(btn.getAttribute("data-last-name") || "").trim();
+        var activeSessions = Number(btn.getAttribute("data-active-sessions") || 0);
+
+        if (!studentId) {
+          if (!idNumber) return;
+          window.location.href =
+            "/admin/student-sitin?q=" + encodeURIComponent(idNumber);
+          return;
+        }
+
+        if (!window.bootstrap || !window.bootstrap.Modal || !sitInModalEl) {
+          window.location.href =
+            "/admin/student-sitin?q=" + encodeURIComponent(idNumber);
+          return;
+        }
+
+        if (sitInStudentDisplay) {
+          sitInStudentDisplay.value =
+            (idNumber ? idNumber + " - " : "") + (firstName + " " + lastName).trim();
+        }
+
+        var returnTo = window.location.pathname + window.location.search;
+        if (timeInForm && typeof timeInForm.reset === "function") {
+          timeInForm.reset();
+        }
+        if (timeInStudentId) timeInStudentId.value = studentId;
+        if (timeOutStudentId) timeOutStudentId.value = studentId;
+        if (timeInReturnTo) timeInReturnTo.value = returnTo;
+        if (timeOutReturnTo) timeOutReturnTo.value = returnTo;
+
+        if (activeSessions > 0) {
+          if (sitInActiveAlert) sitInActiveAlert.style.display = "block";
+          if (timeOutForm) timeOutForm.style.display = "block";
+          if (timeInForm) timeInForm.style.display = "none";
+        } else {
+          if (sitInActiveAlert) sitInActiveAlert.style.display = "none";
+          if (timeOutForm) timeOutForm.style.display = "none";
+          if (timeInForm) timeInForm.style.display = "block";
+        }
+
+        try {
+          if (searchModalEl) {
+            var searchModal = window.bootstrap.Modal.getInstance(searchModalEl);
+            if (searchModal) searchModal.hide();
+          }
+        } catch (err) {}
+
+        var sitInModal = window.bootstrap.Modal.getOrCreateInstance(sitInModalEl);
+        sitInModal.show();
       });
 
       form.addEventListener("submit", async function (e) {

@@ -1,282 +1,165 @@
 <section class="py-3 py-lg-4">
   <div class="container-fluid px-lg-3">
-    <div class="panel-card mb-3">
-      <div class="panel-header">Student Sit-in</div>
-      <div class="panel-body">
-        <form action="/admin/student-sitin" method="GET" class="row g-2">
-          <div class="col-md-10">
-            <input
-              type="text"
-              name="q"
-              class="form-control"
-              value="<%= query || '' %>"
-              placeholder="Search by student name or ID number"
-              required
-            />
-          </div>
-          <div class="col-md-2 d-grid">
-            <button class="btn btn-primary" type="submit">Search</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <% 
+      var purposeGraphSafe = purposeGraph || { labels: ["C#","C","Java","ASP.NET","PHP","Python","JavaScript","TypeScript","Networking"], counts: [0,0,0,0,0,0,0,0,0], yMax: 10 };
+      var labGraphSafe = labGraph || { labels: ["524","526","528","530","542","Mac"], counts: [0,0,0,0,0,0], yMax: 10 };
+      var purposeYMax = Number(purposeGraphSafe.yMax || 10) || 10;
+      var labYMax = Number(labGraphSafe.yMax || 10) || 10;
+    %>
 
-    <div class="row g-3">
-      <div class="col-xl-8">
-        <div class="panel-card">
-          <div class="panel-header">Search Results</div>
-          <div class="panel-body table-responsive">
-            <table id="adminStudentSitInResultsTable" class="table table-bordered align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>ID Number</th>
-                  <th>Name</th>
-                  <th>Course</th>
-                  <th>Year</th>
-                  <th>Used Sessions</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (!results || !results.length) { %>
-                <tr>
-                  <td colspan="7" class="text-center py-4 text-muted">
-                    <%= query ? 'No matching students found.' : 'Search for a student to see results.' %>
-                  </td>
-                </tr>
-                <% } %>
-
-                <% (results || []).forEach(student => { %>
-                <tr class="<%= selectedStudent && String(selectedStudent.id) === String(student.id) ? 'table-primary' : '' %>">
-                  <td><%= student.id_number %></td>
-                  <td><%= student.first_name %> <%= student.last_name %></td>
-                  <td><%= student.course || '-' %></td>
-                  <td><%= student.course_level || '-' %></td>
-                  <td><%= student.used_sessions || 0 %></td>
-                  <td>
-                    <span class="badge <%= Number(student.active_sessions) > 0 ? 'bg-success' : 'bg-secondary' %>">
-                      <%= Number(student.active_sessions) > 0 ? 'Active' : 'Idle' %>
-                    </span>
-                  </td>
-                  <td class="text-nowrap">
-                    <a
-                      class="btn btn-sm <%= selectedStudent && String(selectedStudent.id) === String(student.id) ? 'btn-primary' : 'btn-outline-primary' %>"
-                      href="/admin/student-sitin?q=<%= encodeURIComponent(query || '') %>&amp;sid=<%= student.id %>"
-                      data-action="select-student"
-                      data-student-id="<%= student.id %>"
-                      data-student-id-number="<%= student.id_number %>"
-                      data-student-first-name="<%= student.first_name %>"
-                      data-student-last-name="<%= student.last_name %>"
-                      data-student-active-sessions="<%= student.active_sessions %>"
-                    >
-                      Sit-in
-                    </a>
-                  </td>
-                </tr>
-                <% }) %>
-              </tbody>
-            </table>
+    <div class="row g-3 mb-3">
+      <div class="col-xl-6">
+        <div class="panel-card h-100">
+          <div class="panel-header">Purpose (Active)</div>
+          <div class="panel-body">
+            <div class="d-flex">
+              <div class="d-flex flex-column justify-content-between text-muted small me-2" style="height: 240px; min-width: 36px;">
+                <span><%= purposeYMax %></span>
+                <span><%= Math.round(purposeYMax * 0.75) %></span>
+                <span><%= Math.round(purposeYMax * 0.5) %></span>
+                <span><%= Math.round(purposeYMax * 0.25) %></span>
+                <span>0</span>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-end gap-2" style="height: 240px; border-left: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; padding: 10px 10px 0;">
+                  <% (purposeGraphSafe.labels || []).forEach(function(label, idx){ 
+                      var count = Number((purposeGraphSafe.counts || [])[idx] || 0);
+                      var heightPct = purposeYMax ? Math.max((count / purposeYMax) * 100, 0) : 0;
+                  %>
+                    <div class="d-flex flex-column align-items-center justify-content-end" style="flex: 1; min-width: 36px;">
+                      <div class="text-muted small" style="font-size: 0.72rem; line-height: 1;"><%= count %></div>
+                      <div class="bg-primary" style="width: 100%; max-width: 34px; height: <%= heightPct %>%; min-height: 2px; border-radius: 6px 6px 0 0;"></div>
+                      <div class="text-muted small mt-1" style="font-size: 0.72rem; width: 56px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<%= label %>"><%= label %></div>
+                    </div>
+                  <% }) %>
+                </div>
+              </div>
+            </div>
+            <div class="text-muted small mt-2">X-axis: Purpose • Y-axis: No. of students</div>
           </div>
         </div>
       </div>
 
-      <div class="col-xl-4">
+      <div class="col-xl-6">
         <div class="panel-card h-100">
-          <div class="panel-header">Admin Time In (Student)</div>
+          <div class="panel-header">Laboratory (Active)</div>
           <div class="panel-body">
-            <div
-              id="adminStudentSitInSelectPrompt"
-              class="alert alert-info mb-0"
-              style="display:<%= selectedStudent ? 'none' : 'block' %>"
-            >
-              Search and select a student from the table to continue.
-            </div>
-
-            <div id="adminStudentSitInSelectedBlock" style="display:<%= selectedStudent ? 'block' : 'none' %>">
-              <div class="col-12">
-                <label class="form-label fw-semibold">Student</label>
-                <input
-                  id="adminStudentSitInSelectedDisplay"
-                  type="text"
-                  class="form-control"
-                  value="<%= selectedStudent ? `${selectedStudent.id_number} - ${selectedStudent.first_name} ${selectedStudent.last_name}` : '' %>"
-                  readonly
-                />
+            <div class="d-flex">
+              <div class="d-flex flex-column justify-content-between text-muted small me-2" style="height: 240px; min-width: 36px;">
+                <span><%= labYMax %></span>
+                <span><%= Math.round(labYMax * 0.75) %></span>
+                <span><%= Math.round(labYMax * 0.5) %></span>
+                <span><%= Math.round(labYMax * 0.25) %></span>
+                <span>0</span>
               </div>
-
-              <div
-                id="adminStudentSitInActiveAlert"
-                class="alert alert-warning py-2 mt-3 mb-3"
-                style="display:<%= selectedStudent && Number(selectedStudent.active_sessions) > 0 ? 'block' : 'none' %>"
-              >
-                This student already has an active sit-in session.
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-end gap-2" style="height: 240px; border-left: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; padding: 10px 10px 0;">
+                  <% (labGraphSafe.labels || []).forEach(function(label, idx){ 
+                      var count = Number((labGraphSafe.counts || [])[idx] || 0);
+                      var heightPct = labYMax ? Math.max((count / labYMax) * 100, 0) : 0;
+                  %>
+                    <div class="d-flex flex-column align-items-center justify-content-end" style="flex: 1; min-width: 36px;">
+                      <div class="text-muted small" style="font-size: 0.72rem; line-height: 1;"><%= count %></div>
+                      <div class="bg-success" style="width: 100%; max-width: 34px; height: <%= heightPct %>%; min-height: 2px; border-radius: 6px 6px 0 0;"></div>
+                      <div class="text-muted small mt-1" style="font-size: 0.72rem; width: 56px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<%= label %>"><%= label %></div>
+                    </div>
+                  <% }) %>
+                </div>
               </div>
-
-              <form
-                id="adminStudentSitInTimeOutForm"
-                action="/admin/student-sitin/time-out"
-                method="POST"
-                style="display:<%= selectedStudent && Number(selectedStudent.active_sessions) > 0 ? 'block' : 'none' %>"
-              >
-                <input id="adminStudentSitInTimeOutQuery" type="hidden" name="query" value="<%= query %>" />
-                <input id="adminStudentSitInTimeOutSid" type="hidden" name="sid" value="<%= selectedStudent ? selectedStudent.id : '' %>" />
-                <input id="adminStudentSitInTimeOutStudentId" type="hidden" name="student_id" value="<%= selectedStudent ? selectedStudent.id : '' %>" />
-                <button class="btn btn-danger w-100" type="submit">
-                  Time Out Student
-                </button>
-              </form>
-
-              <form
-                id="adminStudentSitInTimeInForm"
-                action="/admin/student-sitin/time-in"
-                method="POST"
-                class="row g-3"
-                style="display:<%= selectedStudent && Number(selectedStudent.active_sessions) > 0 ? 'none' : (selectedStudent ? 'flex' : 'none') %>"
-              >
-                <input id="adminStudentSitInTimeInQuery" type="hidden" name="query" value="<%= query %>" />
-                <input id="adminStudentSitInTimeInSid" type="hidden" name="sid" value="<%= selectedStudent ? selectedStudent.id : '' %>" />
-                <input id="adminStudentSitInTimeInStudentId" type="hidden" name="student_id" value="<%= selectedStudent ? selectedStudent.id : '' %>" />
-
-                <div class="col-12">
-                  <label class="form-label fw-semibold">Lab Room</label>
-                  <select name="lab_room" class="form-select" required>
-                    <option value="" disabled selected>Select laboratory</option>
-                    <option value="524">524</option>
-                    <option value="526">526</option>
-                    <option value="528">528</option>
-                    <option value="Networking Lab">Networking Lab</option>
-                  </select>
-                </div>
-
-                <div class="col-12">
-                  <label class="form-label fw-semibold">Purpose</label>
-                  <textarea
-                    name="purpose"
-                    class="form-control"
-                    rows="4"
-                    placeholder="Ex. Programming activity, research, project work"
-                    required
-                  ></textarea>
-                </div>
-
-                <div class="col-12">
-                  <button class="btn btn-primary w-100" type="submit">Record Time In</button>
-                </div>
-              </form>
             </div>
+            <div class="text-muted small mt-2">X-axis: Laboratory • Y-axis: No. of students</div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-header">Active Sit-ins</div>
+      <div class="panel-body table-responsive">
+        <table class="table table-bordered align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="text-nowrap">Sit ID Number</th>
+              <th class="text-nowrap">ID Number</th>
+              <th>Name</th>
+              <th>Purpose</th>
+              <th class="text-nowrap">Laboratory</th>
+              <th class="text-nowrap">Session</th>
+              <th class="text-nowrap">Status</th>
+              <th class="text-nowrap">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!results || !results.length) { %>
+              <tr>
+                <td colspan="8" class="text-center py-4 text-muted">
+                  No active sit-in sessions found.
+                </td>
+              </tr>
+            <% } %>
+
+            <% (results || []).forEach(row => { %>
+              <tr>
+                <td><%= row.sitin_id %></td>
+                <td><%= row.id_number %></td>
+                <td><%= row.first_name %> <%= row.last_name %></td>
+                <td><%= row.purpose %></td>
+                <td><%= row.lab_room %></td>
+                <td>
+                  <% if (row.time_in) { %>
+                    <%= new Date(row.time_in).toLocaleString() %>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+                <td>
+                  <span class="badge <%= String(row.status) === 'Active' ? 'bg-success' : 'bg-secondary' %>">
+                    <%= row.status || '-' %>
+                  </span>
+                </td>
+                <td>
+                  <form action="/admin/student-sitin/time-out" method="POST" class="m-0">
+                    <input type="hidden" name="student_id" value="<%= row.user_id %>" />
+                    <input type="hidden" name="returnTo" value="/admin/student-sitin?page=<%= page || 1 %>" />
+                    <button class="btn btn-sm btn-danger" type="submit">
+                      Time-out
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-footer p-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="text-muted small">
+            Page <%= page || 1 %> of <%= totalPages || 1 %> • <%= total || 0 %> total
+          </div>
+          <nav aria-label="Active sit-ins pages">
+            <ul class="pagination mb-0">
+              <li class="page-item <%= (page || 1) <= 1 ? 'disabled' : '' %>">
+                <a class="page-link" href="/admin/student-sitin?page=<%= Math.max((page || 1) - 1, 1) %>">Previous</a>
+              </li>
+              <% 
+                var p = page || 1;
+                var tp = totalPages || 1;
+                var windowSize = 3;
+                var start = Math.max(1, p - windowSize);
+                var end = Math.min(tp, p + windowSize);
+                for (var i = start; i <= end; i++) { 
+              %>
+                <li class="page-item <%= i === p ? 'active' : '' %>">
+                  <a class="page-link" href="/admin/student-sitin?page=<%= i %>"><%= i %></a>
+                </li>
+              <% } %>
+              <li class="page-item <%= (page || 1) >= (totalPages || 1) ? 'disabled' : '' %>">
+                <a class="page-link" href="/admin/student-sitin?page=<%= Math.min((page || 1) + 1, (totalPages || 1)) %>">Next</a>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
     </div>
   </div>
 </section>
-
-<script>
-  (function () {
-    var table = document.getElementById("adminStudentSitInResultsTable");
-    var prompt = document.getElementById("adminStudentSitInSelectPrompt");
-    var selectedBlock = document.getElementById("adminStudentSitInSelectedBlock");
-    var display = document.getElementById("adminStudentSitInSelectedDisplay");
-    var activeAlert = document.getElementById("adminStudentSitInActiveAlert");
-    var timeInForm = document.getElementById("adminStudentSitInTimeInForm");
-    var timeOutForm = document.getElementById("adminStudentSitInTimeOutForm");
-    var timeInStudentId = document.getElementById("adminStudentSitInTimeInStudentId");
-    var timeOutStudentId = document.getElementById("adminStudentSitInTimeOutStudentId");
-    var timeInSid = document.getElementById("adminStudentSitInTimeInSid");
-    var timeOutSid = document.getElementById("adminStudentSitInTimeOutSid");
-    var timeInQuery = document.getElementById("adminStudentSitInTimeInQuery");
-    var timeOutQuery = document.getElementById("adminStudentSitInTimeOutQuery");
-    var searchInput = document.querySelector('form[action="/admin/student-sitin"] input[name="q"]');
-
-    if (
-      !table ||
-      !prompt ||
-      !selectedBlock ||
-      !display ||
-      !activeAlert ||
-      !timeInForm ||
-      !timeOutForm ||
-      !timeInStudentId ||
-      !timeOutStudentId ||
-      !timeInSid ||
-      !timeOutSid ||
-      !timeInQuery ||
-      !timeOutQuery
-    ) {
-      return;
-    }
-
-    function setSelectedStudent(student, href) {
-      var id = String(student.id || "").trim();
-      var idNumber = String(student.id_number || "").trim();
-      var firstName = String(student.first_name || "").trim();
-      var lastName = String(student.last_name || "").trim();
-      var activeSessions = Number(student.active_sessions || 0);
-      var q = searchInput ? String(searchInput.value || "").trim() : "";
-
-      display.value = (idNumber ? idNumber + " - " : "") + (firstName + " " + lastName).trim();
-      timeInStudentId.value = id;
-      timeOutStudentId.value = id;
-      timeInSid.value = id;
-      timeOutSid.value = id;
-      timeInQuery.value = q;
-      timeOutQuery.value = q;
-
-      prompt.style.display = "none";
-      selectedBlock.style.display = "block";
-
-      if (activeSessions > 0) {
-        activeAlert.style.display = "block";
-        timeOutForm.style.display = "block";
-        timeInForm.style.display = "none";
-      } else {
-        activeAlert.style.display = "none";
-        timeOutForm.style.display = "none";
-        timeInForm.style.display = "flex";
-      }
-
-      if (href) {
-        try {
-          window.history.replaceState(null, "", href.replace(/&amp;/g, "&"));
-        } catch (e) {}
-      }
-    }
-
-    function clearSelectedUi() {
-      var rows = table.querySelectorAll("tbody tr");
-      rows.forEach(function (row) {
-        row.classList.remove("table-primary");
-        var link = row.querySelector('a[data-action="select-student"]');
-        if (!link) return;
-        link.classList.remove("btn-primary");
-        link.classList.add("btn-outline-primary");
-      });
-    }
-
-    function markRowSelected(link) {
-      var row = link.closest("tr");
-      if (row) row.classList.add("table-primary");
-      link.classList.remove("btn-outline-primary");
-      link.classList.add("btn-primary");
-    }
-
-    table.addEventListener("click", function (e) {
-      var link = e.target && e.target.closest ? e.target.closest('a[data-action="select-student"]') : null;
-      if (!link) return;
-      e.preventDefault();
-
-      var student = {
-        id: link.getAttribute("data-student-id"),
-        id_number: link.getAttribute("data-student-id-number"),
-        first_name: link.getAttribute("data-student-first-name"),
-        last_name: link.getAttribute("data-student-last-name"),
-        active_sessions: link.getAttribute("data-student-active-sessions"),
-      };
-
-      clearSelectedUi();
-      markRowSelected(link);
-      setSelectedStudent(student, link.getAttribute("href"));
-    });
-  })();
-</script>

@@ -18,9 +18,7 @@
           <div class="col-md-2">
             <label class="form-label fw-semibold">Status</label>
             <select name="status" class="form-select">
-              <option value="">All</option>
-              <option value="Active" <%= filters.status === 'Active' ? 'selected' : '' %>>Active</option>
-              <option value="Completed" <%= filters.status === 'Completed' ? 'selected' : '' %>>Completed</option>
+              <option value="Completed" selected>Completed</option>
             </select>
           </div>
 
@@ -28,9 +26,12 @@
             <label class="form-label fw-semibold">Lab Room</label>
             <select name="lab_room" class="form-select">
               <option value="">All</option>
-              <% (labRooms || []).forEach((lab) => { %>
-              <option value="<%= lab %>" <%= filters.lab_room === lab ? 'selected' : '' %>><%= lab %></option>
-              <% }) %>
+              <option value="524" <%= filters.lab_room === '524' ? 'selected' : '' %>>524</option>
+              <option value="526" <%= filters.lab_room === '526' ? 'selected' : '' %>>526</option>
+              <option value="528" <%= filters.lab_room === '528' ? 'selected' : '' %>>528</option>
+              <option value="530" <%= filters.lab_room === '530' ? 'selected' : '' %>>530</option>
+              <option value="542" <%= filters.lab_room === '542' ? 'selected' : '' %>>542</option>
+              <option value="Mac" <%= filters.lab_room === 'Mac' ? 'selected' : '' %>>Mac</option>
             </select>
           </div>
 
@@ -58,33 +59,6 @@
       </div>
     </div>
 
-    <div class="row g-3 mb-3">
-      <div class="col-md-3">
-        <div class="summary-card">
-          <span>Total Records</span>
-          <strong><%= summary.totalRecords %></strong>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="summary-card">
-          <span>Active</span>
-          <strong><%= summary.activeRecords %></strong>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="summary-card">
-          <span>Completed</span>
-          <strong><%= summary.completedRecords %></strong>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="summary-card">
-          <span>Unique Students</span>
-          <strong><%= summary.uniqueStudents %></strong>
-        </div>
-      </div>
-    </div>
-
     <div class="panel-card">
       <div class="panel-header">Report Results</div>
       <div class="panel-body table-responsive">
@@ -95,17 +69,16 @@
               <th>Name</th>
               <th>Course</th>
               <th>Year</th>
-              <th>Lab</th>
               <th>Purpose</th>
-              <th>Status</th>
               <th>Time In</th>
               <th>Time Out</th>
+              <th>Date</th>
             </tr>
           </thead>
           <tbody>
             <% if (!records.length) { %>
             <tr>
-              <td colspan="9" class="text-center py-4 text-muted">No sit-in records found for the selected filters.</td>
+              <td colspan="8" class="text-center py-4 text-muted">No sit-in records found for the selected filters.</td>
             </tr>
             <% } %>
 
@@ -115,13 +88,10 @@
               <td><%= item.first_name %> <%= item.last_name %></td>
               <td><%= item.course || '-' %></td>
               <td><%= item.course_level || '-' %></td>
-              <td><%= item.lab_room %></td>
               <td><%= item.purpose %></td>
-              <td>
-                <span class="badge <%= item.status === 'Active' ? 'bg-success' : 'bg-secondary' %>"><%= item.status %></span>
-              </td>
-              <td><%= item.time_in ? new Date(item.time_in).toLocaleString() : '-' %></td>
-              <td><%= item.time_out ? new Date(item.time_out).toLocaleString() : '-' %></td>
+              <td><%= item.time_in ? new Date(item.time_in).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-' %></td>
+              <td><%= item.time_out ? new Date(item.time_out).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-' %></td>
+              <td><%= item.time_in ? new Date(item.time_in).toLocaleDateString() : '-' %></td>
             </tr>
             <% }) %>
           </tbody>

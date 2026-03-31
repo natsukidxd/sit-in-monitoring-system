@@ -145,6 +145,14 @@ function getAnnouncements(limit = 10) {
   });
 }
 
+function getSafeReturnTo(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!raw.startsWith("/")) return "";
+  if (raw.startsWith("//")) return "";
+  return raw;
+}
+
 router.get("/", requireAdmin, async (req, res) => {
   try {
     const [
@@ -547,69 +555,165 @@ router.get("/student-sitin/search", requireAdmin, (req, res) => {
 
 router.get("/student-sitin", requireAdmin, (req, res) => {
   try {
-    const searchTerm = (req.query.q || "").trim();
-    const selectedId = String(req.query.sid || "").trim();
-    if (!searchTerm) {
-      return res.render("admin/student-sitin", {
-        title: "Student Sit-in",
-        query: "",
-        results: [],
-        selectedStudent: null,
-      });
-    }
+    const page = Math.max(parseInt(String(req.query.page || "1"), 10) || 1, 1);
+    const pageSize = 20;
+    const offset = (page - 1) * pageSize;
+    const purposeOptions = [
+      "C#",
+      "C",
+      "Java",
+      "ASP.NET",
+      "PHP",
+      "Python",
+      "JavaScript",
+      "TypeScript",
+      "Networking",
+    ];
+    const labOptions = ["524", "526", "528", "530", "542", "Mac"];
 
-    const searchSql = `
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM sitin_records sr
+      JOIN users u ON u.id = sr.user_id
+      WHERE sr.status = 'Active' AND u.role = 'student'
+    `;
+
+    const purposeSql = `
       SELECT
-        u.id,
+        COALESCE(NULLIF(TRIM(sr.purpose), ''), 'Unspecified') AS label,
+        COUNT(DISTINCT sr.user_id) AS total
+      FROM sitin_records sr
+      JOIN users u ON u.id = sr.user_id
+      WHERE sr.status = 'Active' AND u.role = 'student'
+      GROUP BY COALESCE(NULLIF(TRIM(sr.purpose), ''), 'Unspecified')
+    `;
+
+    const labSql = `
+      SELECT
+        COALESCE(NULLIF(TRIM(sr.lab_room), ''), 'Unspecified') AS label,
+        COUNT(DISTINCT sr.user_id) AS total
+      FROM sitin_records sr
+      JOIN users u ON u.id = sr.user_id
+      WHERE sr.status = 'Active' AND u.role = 'student'
+      GROUP BY COALESCE(NULLIF(TRIM(sr.lab_room), ''), 'Unspecified')
+    `;
+
+    const dataSql = `
+      SELECT
+        sr.id AS sitin_id,
+        sr.user_id,
         u.id_number,
         u.first_name,
         u.last_name,
-        u.course,
-        u.course_level,
-        (
-          SELECT COUNT(*)
-          FROM sitin_records sr
-          WHERE sr.user_id = u.id AND sr.status = 'Completed'
-        ) AS used_sessions,
-        (
-          SELECT COUNT(*)
-          FROM sitin_records sr
-          WHERE sr.user_id = u.id AND sr.status = 'Active'
-        ) AS active_sessions
-      FROM users u
-      WHERE u.role = 'student'
-        AND (
-          u.id_number LIKE ?
-          OR (u.first_name || ' ' || u.last_name) LIKE ?
-          OR (u.last_name || ' ' || u.first_name) LIKE ?
-        )
-      ORDER BY u.last_name ASC, u.first_name ASC
-      LIMIT 25
+        sr.purpose,
+        sr.lab_room,
+        sr.time_in,
+        sr.status
+      FROM sitin_records sr
+      JOIN users u ON u.id = sr.user_id
+      WHERE sr.status = 'Active' AND u.role = 'student'
+      ORDER BY sr.time_in DESC
+      LIMIT ? OFFSET ?
     `;
-    const likeQuery = `%${searchTerm}%`;
-    db.all(searchSql, [likeQuery, likeQuery, likeQuery], (err, rows) => {
-      if (err) {
-        console.error(err);
-        req.session.error = "Unable to search student records.";
+    db.get(countSql, [], (countErr, countRow) => {
+      if (countErr) {
+        console.error(countErr);
+        req.session.error = "Unable to load active sit-in sessions.";
         return res.redirect("/admin/student-sitin");
       }
+      const total = Number(countRow?.total || 0);
+      const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+      const normalizedPage = Math.min(page, totalPages);
+      const normOffset = (normalizedPage - 1) * pageSize;
 
-      const results = rows || [];
-      const selectedStudent =
-        (selectedId
-          ? results.find((item) => String(item.id) === selectedId) || null
-          : null) || (results.length === 1 ? results[0] : null);
+      db.all(purposeSql, [], (purposeErr, purposeRows) => {
+        if (purposeErr) {
+          console.error(purposeErr);
+          req.session.error = "Unable to load active sit-in sessions.";
+          return res.redirect("/admin/student-sitin");
+        }
 
-      res.render("admin/student-sitin", {
-        title: "Student Sit-in",
-        query: searchTerm,
-        results,
-        selectedStudent,
+        db.all(labSql, [], (labErr, labRows) => {
+          if (labErr) {
+            console.error(labErr);
+            req.session.error = "Unable to load active sit-in sessions.";
+            return res.redirect("/admin/student-sitin");
+          }
+
+          const purposeMap = new Map(
+            (purposeRows || []).map((row) => [
+              String(row.label || "").trim(),
+              Number(row.total || 0),
+            ])
+          );
+          const labMap = new Map(
+            (labRows || []).map((row) => [
+              String(row.label || "").trim(),
+              Number(row.total || 0),
+            ])
+          );
+
+          const purposeCounts = purposeOptions.map((label) => purposeMap.get(label) || 0);
+          const labCounts = labOptions.map((label) => labMap.get(label) || 0);
+
+          const purposeOtherCount = Array.from(purposeMap.entries()).reduce(
+            (sum, [label, value]) =>
+              purposeOptions.includes(label) ? sum : sum + Number(value || 0),
+            0
+          );
+          const labOtherCount = Array.from(labMap.entries()).reduce(
+            (sum, [label, value]) =>
+              labOptions.includes(label) ? sum : sum + Number(value || 0),
+            0
+          );
+
+          const purposeLabels = purposeOtherCount
+            ? [...purposeOptions, "Other"]
+            : [...purposeOptions];
+          const labLabels = labOtherCount ? [...labOptions, "Other"] : [...labOptions];
+          const purposeSeries = purposeOtherCount
+            ? [...purposeCounts, purposeOtherCount]
+            : purposeCounts;
+          const labSeries = labOtherCount ? [...labCounts, labOtherCount] : labCounts;
+
+          const purposeMax = Math.max(...purposeSeries, 0);
+          const labMax = Math.max(...labSeries, 0);
+
+          const purposeYMax = total ? Math.max(purposeMax, 10) : 10;
+          const labYMax = total ? Math.max(labMax, 10) : 10;
+
+          db.all(dataSql, [pageSize, normOffset], (err, rows) => {
+            if (err) {
+              console.error(err);
+              req.session.error = "Unable to load active sit-in sessions.";
+              return res.redirect("/admin/student-sitin");
+            }
+
+            res.render("admin/student-sitin", {
+              title: "Active Sit-in",
+              results: rows || [],
+              page: normalizedPage,
+              pageSize,
+              total,
+              totalPages,
+              purposeGraph: {
+                labels: purposeLabels,
+                counts: purposeSeries,
+                yMax: purposeYMax,
+              },
+              labGraph: {
+                labels: labLabels,
+                counts: labSeries,
+                yMax: labYMax,
+              },
+            });
+          });
+        });
       });
     });
   } catch (error) {
     console.error(error);
-    req.session.error = "Unable to open student sit-in.";
+    req.session.error = "Unable to open active sit-in sessions.";
     res.redirect("/admin");
   }
 });
@@ -618,9 +722,10 @@ router.post("/student-sitin/time-in", requireAdmin, (req, res) => {
   const { student_id, lab_room, purpose } = req.body;
   const query = (req.body.query || "").trim();
   const sid = String(req.body.sid || "").trim();
-  const returnTo = query
+  const defaultReturnTo = query
     ? `/admin/student-sitin?q=${encodeURIComponent(query)}${sid ? `&sid=${encodeURIComponent(sid)}` : ""}`
     : "/admin/student-sitin";
+  const returnTo = getSafeReturnTo(req.body.returnTo) || defaultReturnTo;
 
   if (!student_id || !lab_room || !purpose) {
     req.session.error = "Student, lab room, and purpose are required.";
@@ -717,9 +822,10 @@ router.post("/student-sitin/time-out", requireAdmin, (req, res) => {
   const studentId = req.body.student_id;
   const query = (req.body.query || "").trim();
   const sid = String(req.body.sid || "").trim();
-  const returnTo = query
+  const defaultReturnTo = query
     ? `/admin/student-sitin?q=${encodeURIComponent(query)}${sid ? `&sid=${encodeURIComponent(sid)}` : ""}`
     : "/admin/student-sitin";
+  const returnTo = getSafeReturnTo(req.body.returnTo) || defaultReturnTo;
 
   if (!studentId) {
     req.session.error = "Student is required.";
@@ -930,7 +1036,7 @@ router.post("/students/reset-sessions", requireAdmin, (req, res) => {
         return res.redirect("/admin/search");
       }
 
-      req.session.message = `Reset complete: updated sessions_left to 30 for ${this.changes || 0} students.`;
+      req.session.message = `Reset complete: Affected ${this.changes || 0} students.`;
       res.redirect("/admin/search");
     }
   );
@@ -1030,7 +1136,9 @@ router.get("/feedback", requireAdmin, (req, res) => {
 
 router.get("/reports", requireAdmin, (req, res) => {
   const filters = normalizeReportFilters(req.query);
+  filters.status = "Completed";
   const { whereClause, params } = buildReportWhere(filters);
+  const completedWhereClause = `${whereClause} AND sr.time_out IS NOT NULL`;
 
   const reportSql = `
     SELECT
@@ -1040,6 +1148,7 @@ router.get("/reports", requireAdmin, (req, res) => {
       sr.status,
       sr.time_in,
       sr.time_out,
+      DATE(sr.time_in) AS date,
       u.id_number,
       u.first_name,
       u.last_name,
@@ -1047,7 +1156,7 @@ router.get("/reports", requireAdmin, (req, res) => {
       u.course_level
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
-    WHERE ${whereClause}
+    WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
     LIMIT 2000
   `;
@@ -1073,20 +1182,12 @@ router.get("/reports", requireAdmin, (req, res) => {
         return res.redirect("/admin");
       }
 
-      const summary = {
-        totalRecords: rows.length,
-        activeRecords: rows.filter((item) => item.status === "Active").length,
-        completedRecords: rows.filter((item) => item.status === "Completed").length,
-        uniqueStudents: new Set(rows.map((item) => item.id_number)).size,
-      };
-
       const exportQuery = new URLSearchParams(filters).toString();
 
       res.render("admin/reports", {
         title: "Reports",
         filters,
         records: rows || [],
-        summary,
         labRooms: (labsRows || []).map((item) => item.lab_room),
         exportQuery,
       });
@@ -1096,7 +1197,9 @@ router.get("/reports", requireAdmin, (req, res) => {
 
 router.get("/reports/export", requireAdmin, (req, res) => {
   const filters = normalizeReportFilters(req.query);
+  filters.status = "Completed";
   const { whereClause, params } = buildReportWhere(filters);
+  const completedWhereClause = `${whereClause} AND sr.time_out IS NOT NULL`;
 
   const reportSql = `
     SELECT
@@ -1104,14 +1207,13 @@ router.get("/reports/export", requireAdmin, (req, res) => {
       (u.first_name || ' ' || u.last_name) AS student_name,
       COALESCE(u.course, '') AS course,
       COALESCE(u.course_level, '') AS year_level,
-      sr.lab_room,
       sr.purpose,
-      sr.status,
       sr.time_in,
-      COALESCE(sr.time_out, '') AS time_out
+      COALESCE(sr.time_out, '') AS time_out,
+      DATE(sr.time_in) AS date
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
-    WHERE ${whereClause}
+    WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
   `;
 
@@ -1127,11 +1229,10 @@ router.get("/reports/export", requireAdmin, (req, res) => {
       "Student Name",
       "Course",
       "Year Level",
-      "Lab Room",
       "Purpose",
-      "Status",
       "Time In",
       "Time Out",
+      "Date",
     ];
 
     const csvLines = [csvHeader.map(escapeCsv).join(",")];
@@ -1142,11 +1243,10 @@ router.get("/reports/export", requireAdmin, (req, res) => {
           row.student_name,
           row.course,
           row.year_level,
-          row.lab_room,
           row.purpose,
-          row.status,
           row.time_in,
           row.time_out,
+          row.date,
         ]
           .map(escapeCsv)
           .join(",")
@@ -1165,7 +1265,9 @@ router.get("/reports/export", requireAdmin, (req, res) => {
 
 router.get("/reports/export/pdf", requireAdmin, (req, res) => {
   const filters = normalizeReportFilters(req.query);
+  filters.status = "Completed";
   const { whereClause, params } = buildReportWhere(filters);
+  const completedWhereClause = `${whereClause} AND sr.time_out IS NOT NULL`;
 
   const reportSql = `
     SELECT
@@ -1173,14 +1275,13 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
       (u.first_name || ' ' || u.last_name) AS student_name,
       COALESCE(u.course, '') AS course,
       COALESCE(u.course_level, '') AS year_level,
-      sr.lab_room,
       sr.purpose,
-      sr.status,
       sr.time_in,
-      COALESCE(sr.time_out, '') AS time_out
+      COALESCE(sr.time_out, '') AS time_out,
+      DATE(sr.time_in) AS date
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
-    WHERE ${whereClause}
+    WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
   `;
 
@@ -1216,7 +1317,6 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
 
     const filterParts = [];
     if (filters.search) filterParts.push(`Search: ${filters.search}`);
-    if (filters.status) filterParts.push(`Status: ${filters.status}`);
     if (filters.lab_room) filterParts.push(`Lab: ${filters.lab_room}`);
     if (filters.date_from) filterParts.push(`From: ${filters.date_from}`);
     if (filters.date_to) filterParts.push(`To: ${filters.date_to}`);
@@ -1226,29 +1326,15 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
       .text(`Filters: ${filterParts.length ? filterParts.join(" | ") : "None"}`);
     doc.moveDown(0.6);
 
-    const summary = {
-      total: rows.length,
-      active: rows.filter((r) => r.status === "Active").length,
-      completed: rows.filter((r) => r.status === "Completed").length,
-      uniqueStudents: new Set(rows.map((r) => r.id_number)).size,
-    };
-    doc
-      .fontSize(10)
-      .text(
-        `Total: ${summary.total}   Active: ${summary.active}   Completed: ${summary.completed}   Unique Students: ${summary.uniqueStudents}`
-      );
-    doc.moveDown(0.6);
-
     const columns = [
-      { key: "id_number", label: "ID", width: 70 },
-      { key: "student_name", label: "Student", width: 150 },
-      { key: "course", label: "Course", width: 140 },
-      { key: "year_level", label: "Year", width: 50 },
-      { key: "lab_room", label: "Lab", width: 60 },
-      { key: "purpose", label: "Purpose", width: 220 },
-      { key: "status", label: "Status", width: 70 },
-      { key: "time_in", label: "Time In", width: 95 },
-      { key: "time_out", label: "Time Out", width: 95 },
+      { key: "id_number", label: "ID", width: 60 },
+      { key: "student_name", label: "Student", width: 120 },
+      { key: "course", label: "Course", width: 90 },
+      { key: "year_level", label: "Year", width: 40 },
+      { key: "purpose", label: "Purpose", width: 240 },
+      { key: "time_in", label: "Time In", width: 80 },
+      { key: "time_out", label: "Time Out", width: 80 },
+      { key: "date", label: "Date", width: 60 },
     ];
 
     const rowHeight = 16;

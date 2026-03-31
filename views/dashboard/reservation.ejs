@@ -10,7 +10,20 @@
         <div class="col-md-9"><input class="form-control reservation-readonly" value="<%= user.first_name %> <%= user.middle_name %> <%= user.last_name %>" readonly></div>
 
         <div class="col-md-3"><label class="form-label">Purpose:</label></div>
-        <div class="col-md-9"><input name="purpose" class="form-control" placeholder="Enter purpose" required></div>
+        <div class="col-md-9">
+          <select name="purpose" class="form-select" required>
+            <option value="" selected disabled>Select purpose</option>
+            <option value="C#">C#</option>
+            <option value="C">C</option>
+            <option value="Java">Java</option>
+            <option value="ASP.NET">ASP.NET</option>
+            <option value="PHP">PHP</option>
+            <option value="Python">Python</option>
+            <option value="JavaScript">JavaScript</option>
+            <option value="TypeScript">TypeScript</option>
+            <option value="Networking">Networking</option>
+          </select>
+        </div>
 
         <div class="col-md-3"><label class="form-label">Lab:</label></div>
         <div class="col-md-9">
@@ -19,7 +32,9 @@
             <option value="524">524</option>
             <option value="526">526</option>
             <option value="528">528</option>
-            <option value="Networking Lab">Networking Lab</option>
+            <option value="530">530</option>
+            <option value="542">542</option>
+            <option value="Mac">Mac</option>
           </select>
         </div>
 
