@@ -1,4 +1,5 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
 const { db } = require("../db");
 const { rules } = require("../dashboardContent");
 const PDFDocument = require("pdfkit");
@@ -409,7 +410,7 @@ router.post("/records/:id/timeout", requireAdmin, (req, res) => {
   db.run(
     `
       UPDATE sitin_records
-      SET status = 'Completed', time_out = CURRENT_TIMESTAMP
+      SET status = 'Completed', time_out = DATETIME('now', 'localtime')
       WHERE id = ? AND status = 'Active'
     `,
     [req.params.id],
@@ -547,6 +548,7 @@ router.get("/student-sitin/search", requireAdmin, (req, res) => {
 router.get("/student-sitin", requireAdmin, (req, res) => {
   try {
     const searchTerm = (req.query.q || "").trim();
+    const selectedId = String(req.query.sid || "").trim();
     if (!searchTerm) {
       return res.render("admin/student-sitin", {
         title: "Student Sit-in",
@@ -592,11 +594,17 @@ router.get("/student-sitin", requireAdmin, (req, res) => {
         return res.redirect("/admin/student-sitin");
       }
 
+      const results = rows || [];
+      const selectedStudent =
+        (selectedId
+          ? results.find((item) => String(item.id) === selectedId) || null
+          : null) || (results.length === 1 ? results[0] : null);
+
       res.render("admin/student-sitin", {
         title: "Student Sit-in",
         query: searchTerm,
-        results: rows || [],
-        selectedStudent: rows?.[0] || null,
+        results,
+        selectedStudent,
       });
     });
   } catch (error) {
@@ -609,8 +617,9 @@ router.get("/student-sitin", requireAdmin, (req, res) => {
 router.post("/student-sitin/time-in", requireAdmin, (req, res) => {
   const { student_id, lab_room, purpose } = req.body;
   const query = (req.body.query || "").trim();
+  const sid = String(req.body.sid || "").trim();
   const returnTo = query
-    ? `/admin/student-sitin?q=${encodeURIComponent(query)}`
+    ? `/admin/student-sitin?q=${encodeURIComponent(query)}${sid ? `&sid=${encodeURIComponent(sid)}` : ""}`
     : "/admin/student-sitin";
 
   if (!student_id || !lab_room || !purpose) {
@@ -671,7 +680,8 @@ router.post("/student-sitin/time-in", requireAdmin, (req, res) => {
                 }
 
                 db.run(
-                  `INSERT INTO sitin_records (user_id, lab_room, purpose) VALUES (?, ?, ?)`,
+                  `INSERT INTO sitin_records (user_id, lab_room, purpose, time_in)
+                   VALUES (?, ?, ?, DATETIME('now', 'localtime'))`,
                   [student_id, lab_room, purpose],
                   function (insertErr) {
                     if (insertErr) {
@@ -706,8 +716,9 @@ router.post("/student-sitin/time-in", requireAdmin, (req, res) => {
 router.post("/student-sitin/time-out", requireAdmin, (req, res) => {
   const studentId = req.body.student_id;
   const query = (req.body.query || "").trim();
+  const sid = String(req.body.sid || "").trim();
   const returnTo = query
-    ? `/admin/student-sitin?q=${encodeURIComponent(query)}`
+    ? `/admin/student-sitin?q=${encodeURIComponent(query)}${sid ? `&sid=${encodeURIComponent(sid)}` : ""}`
     : "/admin/student-sitin";
 
   if (!studentId) {
@@ -726,7 +737,7 @@ router.post("/student-sitin/time-out", requireAdmin, (req, res) => {
 
       db.run(
         `UPDATE sitin_records
-         SET status = 'Completed', time_out = CURRENT_TIMESTAMP
+         SET status = 'Completed', time_out = DATETIME('now', 'localtime')
          WHERE user_id = ? AND status = 'Active'`,
         [studentId],
         function (err) {
@@ -925,9 +936,58 @@ router.post("/students/reset-sessions", requireAdmin, (req, res) => {
   );
 });
 
-router.post("/students/add", requireAdmin, (req, res) => {
-  
-})
+router.post("/students/add", requireAdmin, async(req, res) => {
+  const {
+    id_number,
+    last_name,
+    first_name,
+    middle_name,
+    course_level,
+    password,
+    email,
+    course,
+    address,
+  } = req.body;
+
+  if (
+    !id_number ||
+    !last_name ||
+    !first_name ||
+    !course_level ||
+    !password ||
+    !email ||
+    !course
+  ) {
+    req.session.error = "Please complete all required fields.";
+    return res.redirect("/admin/search");
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  db.run(
+    `INSERT INTO users (id_number, last_name, first_name, middle_name, course_level, email, course, address, password_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id_number,
+      last_name,
+      first_name,
+      middle_name || "",
+      course_level,
+      email,
+      course,
+      address || "",
+      passwordHash,
+    ],
+    function (err) {
+      if (err) {
+        req.session.error = "ID number or email already exists.";
+        return res.redirect("/admin/search");
+      }
+      req.session.message = "Student added successfully.";
+      res.redirect("/admin/search");
+    }
+  );
+});
 
 router.get("/feedback", requireAdmin, (req, res) => {
   db.all(

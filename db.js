@@ -62,7 +62,7 @@ function initializeDatabase() {
         lab_room TEXT NOT NULL,
         purpose TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'Active',
-        time_in DATETIME DEFAULT CURRENT_TIMESTAMP,
+        time_in DATETIME DEFAULT (DATETIME('now', 'localtime')),
         time_out DATETIME,
         FOREIGN KEY (user_id) REFERENCES users(id)
       )

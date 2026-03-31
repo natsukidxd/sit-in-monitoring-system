@@ -322,7 +322,7 @@ router.post("/time-out/:id", requireAuth, (req, res) => {
 
   db.run(
     `UPDATE sitin_records
-     SET status = 'Completed', time_out = CURRENT_TIMESTAMP
+     SET status = 'Completed', time_out = DATETIME('now', 'localtime')
      WHERE id = ? AND user_id = ? AND status = 'Active'`,
     [recordId, userId],
     function () {

@@ -163,7 +163,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <form id="adminStudentAddForm" class="row g-2" autocomplete="off">
+          <form id="adminStudentAddForm" action="/admin/students/add" method="POST" class="row g-2" autocomplete="off">
             <div class="col-12">
               <div class="form-floating mb-3">
                 <input
@@ -211,7 +211,6 @@
                   name="middle_name"
                   id="middle_name"
                   placeholder=""
-                  required
                 />
                 <label for="middle_name">Middle Name</label>
               </div>
@@ -264,6 +263,7 @@
                   name="email"
                   id="email"
                   placeholder=""
+                  required
                 />
                 <label for="email">Email</label>
               </div>
@@ -284,12 +284,11 @@
           </form>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Add Student</button>
+          <button type="submit" form="adminStudentAddForm" class="btn btn-primary">Add Student</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
-  </div>
   </div>
   <div
     class="modal fade"
@@ -348,6 +347,100 @@
         resultsEl.innerHTML = html;
       }
 
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, function (ch) {
+          if (ch === "&") return "&amp;";
+          if (ch === "<") return "&lt;";
+          if (ch === ">") return "&gt;";
+          if (ch === '"') return "&quot;";
+          return "&#39;";
+        });
+      }
+
+      function renderResultsTable(results) {
+        var rowsHtml = results
+          .map(function (student) {
+            var idNumber = String(student.id_number || "").trim();
+            var fullName =
+              String(student.first_name || "").trim() +
+              " " +
+              String(student.last_name || "").trim();
+            var course = student.course || "-";
+            var year = student.course_level || "-";
+            var sessionsLeft =
+              student.sessions_left === null || student.sessions_left === undefined
+                ? 30
+                : student.sessions_left;
+            var hasActive = Number(student.active_sessions) > 0;
+            var badgeClass = hasActive ? "bg-success" : "bg-secondary";
+            var badgeLabel = hasActive ? "Active" : "Idle";
+
+            return `
+              <tr>
+                <td class="text-nowrap">${escapeHtml(idNumber || "-")}</td>
+                <td>${escapeHtml(fullName.trim() || "-")}</td>
+                <td>${escapeHtml(course)}</td>
+                <td class="text-center">${escapeHtml(year)}</td>
+                <td class="text-center">${escapeHtml(sessionsLeft)}</td>
+                <td class="text-center">
+                  <span class="badge ${badgeClass}">${badgeLabel}</span>
+                </td>
+                <td class="text-end">
+                  <button
+                    class="btn btn-sm btn-primary"
+                    type="button"
+                    data-action="sit-in"
+                    data-id-number="${escapeHtml(idNumber)}"
+                    ${idNumber ? "" : "disabled"}
+                  >
+                    Sit-in
+                  </button>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        var note =
+          results.length >= 25
+            ? '<div class="text-muted small mb-2">Showing up to 25 results. Refine your search to narrow it down.</div>'
+            : '<div class="text-muted small mb-2">Select a student to sit-in.</div>';
+
+        return `
+          ${note}
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th style="width: 120px;">ID Number</th>
+                  <th>Student</th>
+                  <th style="width: 120px;">Course</th>
+                  <th style="width: 60px;" class="text-center">Year</th>
+                  <th style="width: 90px;" class="text-center">Sessions</th>
+                  <th style="width: 90px;" class="text-center">Status</th>
+                  <th style="width: 90px;" class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      resultsEl.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest
+          ? e.target.closest('button[data-action="sit-in"]')
+          : null;
+        if (!btn) return;
+
+        var idNumber = String(btn.getAttribute("data-id-number") || "").trim();
+        if (!idNumber) return;
+        window.location.href =
+          "/admin/student-sitin?q=" + encodeURIComponent(idNumber);
+      });
+
       form.addEventListener("submit", async function (e) {
         e.preventDefault();
 
@@ -380,65 +473,7 @@
             return;
           }
 
-          // The modal focuses on a single student for quick sit-in redirect.
-          var student = results[0];
-          var hasActive = Number(student.active_sessions) > 0;
-
-          setResultsHtml(`
-            <div class="card border-0 shadow-sm">
-              <div class="card-body">
-                <div class="d-flex align-items-start justify-content-between gap-3">
-                  <div>
-                    <div class="text-muted small">Student</div>
-                    <div class="fs-5 fw-semibold">
-                      ${student.first_name || ""} ${student.last_name || ""}
-                    </div>
-                    <div class="text-muted small mt-1">ID: ${student.id_number || "-"}</div>
-                    <div class="mt-2 text-muted small">
-                      Course: ${student.course || "-"} | Year: ${student.course_level || "-"}
-                    </div>
-                  </div>
-                  <div class="text-end">
-                    <div class="text-muted small">Sessions Left</div>
-                    <div class="fw-semibold">${student.sessions_left ?? 30}</div>
-                    <div class="mt-2">
-                      <span class="badge ${hasActive ? "bg-success" : "bg-secondary"}">
-                        ${hasActive ? "Active" : "Idle"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  class="alert alert-warning py-2 mt-3 mb-0"
-                  style="display:${hasActive ? "block" : "none"}"
-                >
-                  This student already has an active sit-in. Redirecting will show the appropriate action.
-                </div>
-
-                <div class="d-grid mt-3">
-                  <button
-                    id="adminStudentSitInRedirectBtn"
-                    class="btn btn-primary"
-                    type="button"
-                    data-id-number="${student.id_number || ""}"
-                  >
-                    Sit-in
-                  </button>
-                </div>
-              </div>
-            </div>
-          `);
-
-          var redirectBtn = document.getElementById("adminStudentSitInRedirectBtn");
-          if (redirectBtn) {
-            redirectBtn.addEventListener("click", function () {
-              var idNumber = String(redirectBtn.getAttribute("data-id-number") || "").trim();
-              if (!idNumber) return;
-              window.location.href =
-                "/admin/student-sitin?q=" + encodeURIComponent(idNumber);
-            });
-          }
+          setResultsHtml(renderResultsTable(results));
         } catch (err) {
           console.error(err);
           setResultsHtml('<div class="alert alert-danger mb-0">Unexpected error while searching.</div>');
