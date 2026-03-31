@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -7,7 +9,7 @@ const expressLayouts = require('express-ejs-layouts');
 const { initializeDatabase } = require('./db');
 
 const app = express();
-const PORT = 8080;
+const PORT = Number.parseInt(process.env.PORT || "8080", 10);
 
 initializeDatabase();
 
@@ -31,8 +33,8 @@ app.use(express.json());
 
 app.use(
   session({
-    store: new SQLiteStore({ db: 'sessions.sqlite', dir: './data' }),
-    secret: 'sit-in-monitoring-secret-key',
+    store: new SQLiteStore({ db: "sessions.sqlite", dir: process.env.DATA_DIR || "./data" }),
+    secret: process.env.SESSION_SECRET || "sit-in-monitoring-secret-key",
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 2 }
@@ -90,5 +92,5 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

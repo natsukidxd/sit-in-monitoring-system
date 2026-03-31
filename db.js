@@ -1,9 +1,15 @@
 const path = require("path");
+const fs = require("fs");
 const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcryptjs");
 const { announcements: defaultAnnouncements } = require("./dashboardContent");
 
-const dbPath = path.join(__dirname, "data", "sitin.sqlite");
+const dataDir = process.env.DATA_DIR || path.join(__dirname, "data");
+try {
+  fs.mkdirSync(dataDir, { recursive: true });
+} catch (e) {}
+
+const dbPath = path.join(dataDir, "sitin.sqlite");
 const db = new sqlite3.Database(dbPath);
 
 function initializeDatabase() {
