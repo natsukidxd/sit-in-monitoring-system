@@ -77,7 +77,7 @@ function escapeCsv(value) {
 function normalizeReportFilters(query = {}) {
   return {
     search: String(query.search || "").trim(),
-    status: String(query.status || "").trim(),
+    purpose: String(query.purpose || "").trim(),
     lab_room: String(query.lab_room || "").trim(),
     date_from: String(query.date_from || "").trim(),
     date_to: String(query.date_to || "").trim(),
@@ -96,9 +96,9 @@ function buildReportWhere(filters) {
     params.push(like, like, like);
   }
 
-  if (filters.status) {
-    clauses.push("sr.status = ?");
-    params.push(filters.status);
+  if (filters.purpose) {
+    clauses.push("sr.purpose = ?");
+    params.push(filters.purpose);
   }
 
   if (filters.lab_room) {
@@ -1136,7 +1136,6 @@ router.get("/feedback", requireAdmin, (req, res) => {
 
 router.get("/reports", requireAdmin, (req, res) => {
   const filters = normalizeReportFilters(req.query);
-  filters.status = "Completed";
   const { whereClause, params } = buildReportWhere(filters);
   const completedWhereClause = `${whereClause} AND sr.time_out IS NOT NULL`;
 
