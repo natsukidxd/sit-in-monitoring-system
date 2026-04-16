@@ -204,27 +204,46 @@ router.get("/reservation", requireAuth, async (req, res) => {
 });
 
 router.post("/reservation", requireAuth, async (req, res) => {
-  const { lab_room, purpose, reservation_date, reservation_time } = req.body;
+  const { lab_room, pc_number, purpose, reservation_date, reservation_time } = req.body;
   const reservationTime = formatDateTime(reservation_date, reservation_time);
 
-  if (!lab_room || !purpose || !reservationTime) {
+  if (!lab_room || !pc_number || !purpose || !reservationTime) {
     req.session.error = "Please complete the reservation form.";
     return res.redirect("/dashboard/reservation");
   }
 
-  db.run(
-    `INSERT INTO reservations (user_id, lab_room, purpose, reservation_time) VALUES (?, ?, ?, ?)`,
-    [req.session.user.id, lab_room, purpose, reservationTime],
-    function (err) {
-      if (err) {
-        console.error(err);
-        req.session.error = "Unable to save reservation.";
+  // Check if PC is still available
+  db.get(
+    `SELECT status FROM lab_pcs WHERE pc_number = ? AND lab_room = ?`,
+    [pc_number, lab_room],
+    (err, pc) => {
+      if (err || !pc) {
+        req.session.error = "Selected PC is no longer available.";
         return res.redirect("/dashboard/reservation");
       }
 
-      req.session.message = "Reservation submitted successfully.";
-      res.redirect("/dashboard/reservation");
-    },
+      if (pc.status !== 'available') {
+        req.session.error = "Selected PC is no longer available. Please choose another.";
+        return res.redirect("/dashboard/reservation");
+      }
+
+      // Insert reservation with Pending status (PC remains available until approved)
+      db.run(
+        `INSERT INTO reservations (user_id, lab_room, pc_number, purpose, reservation_time, status) VALUES (?, ?, ?, ?, ?, 'Pending')`,
+        [req.session.user.id, lab_room, pc_number, purpose, reservationTime],
+        function (insertErr) {
+          if (insertErr) {
+            console.error(insertErr);
+            req.session.error = "Unable to save reservation.";
+            return res.redirect("/dashboard/reservation");
+          }
+
+          // Note: PC status is NOT updated here - it remains available until admin approves
+          req.session.message = "Reservation submitted successfully. Awaiting admin approval.";
+          res.redirect("/dashboard/reservation");
+        },
+      );
+    }
   );
 });
 
@@ -390,6 +409,28 @@ router.post("/feedback/:recordId", requireAuth, (req, res) => {
           );
         }
       );
+    }
+  );
+});
+
+// API endpoint to get PC status for a lab
+router.get("/api/lab-pcs", requireAuth, (req, res) => {
+  const lab = req.query.lab;
+  
+  if (!lab) {
+    return res.status(400).json({ error: "Lab parameter is required" });
+  }
+
+  db.all(
+    `SELECT pc_number, status FROM lab_pcs WHERE lab_room = ? ORDER BY pc_number`,
+    [lab],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to fetch PC data" });
+      }
+      
+      res.json(rows || []);
     }
   );
 });
