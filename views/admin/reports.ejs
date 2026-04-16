@@ -4,6 +4,7 @@
       <div class="panel-header">Sit-in Reports</div>
       <div class="panel-body">
         <form action="/admin/reports" method="GET" class="row g-3">
+          <!-- First row: Search, Purpose, Lab Room, PC -->
           <div class="col-md-4">
             <label class="form-label fw-semibold">Search Student</label>
             <input
@@ -45,13 +46,34 @@
           </div>
 
           <div class="col-md-2">
+            <label class="form-label fw-semibold">PC</label>
+            <select name="pc_number" class="form-select">
+              <option value="">All</option>
+              <% for (var i = 1; i <= 50; i++) { %>
+                <option value="<%= i %>" <%= filters.pc_number == i ? 'selected' : '' %>><%= i %></option>
+              <% } %>
+            </select>
+          </div>
+
+          <!-- Second row: Date From, Date To, Time From, Time To -->
+          <div class="col-md-3">
             <label class="form-label fw-semibold">Date From</label>
             <input type="date" name="date_from" class="form-control" value="<%= filters.date_from %>" />
           </div>
 
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="form-label fw-semibold">Date To</label>
             <input type="date" name="date_to" class="form-control" value="<%= filters.date_to %>" />
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Time From</label>
+            <input type="time" name="time_from" class="form-control" value="<%= filters.time_from %>" />
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Time To</label>
+            <input type="time" name="time_to" class="form-control" value="<%= filters.time_to %>" />
           </div>
 
           <div class="col-12 d-flex gap-2">
@@ -79,6 +101,7 @@
               <th>Course</th>
               <th>Year</th>
               <th>Purpose</th>
+              <th>PC</th>
               <th>Time In</th>
               <th>Time Out</th>
               <th>Date</th>
@@ -87,7 +110,7 @@
           <tbody>
             <% if (!records.length) { %>
             <tr>
-              <td colspan="8" class="text-center py-4 text-muted">No sit-in records found for the selected filters.</td>
+              <td colspan="9" class="text-center py-4 text-muted">No sit-in records found for the selected filters.</td>
             </tr>
             <% } %>
 
@@ -98,6 +121,7 @@
               <td><%= item.course || '-' %></td>
               <td><%= item.course_level || '-' %></td>
               <td><%= item.purpose %></td>
+              <td><%= item.pc_number || '-' %></td>
               <td><%= item.time_in ? new Date(item.time_in).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-' %></td>
               <td><%= item.time_out ? new Date(item.time_out).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-' %></td>
               <td><%= item.time_in ? new Date(item.time_in).toLocaleDateString() : '-' %></td>
