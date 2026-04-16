@@ -3,6 +3,11 @@ const bcrypt = require("bcryptjs");
 const { db } = require("../db");
 const { rules } = require("../dashboardContent");
 const PDFDocument = require("pdfkit");
+const {
+  notifyReservationApproved,
+  notifyReservationRejected,
+  notifyNewAnnouncementToAllUsers,
+} = require("../models/notification");
 
 const router = express.Router();
 
@@ -79,8 +84,11 @@ function normalizeReportFilters(query = {}) {
     search: String(query.search || "").trim(),
     purpose: String(query.purpose || "").trim(),
     lab_room: String(query.lab_room || "").trim(),
+    pc_number: String(query.pc_number || "").trim(),
     date_from: String(query.date_from || "").trim(),
     date_to: String(query.date_to || "").trim(),
+    time_from: String(query.time_from || "").trim(),
+    time_to: String(query.time_to || "").trim(),
   };
 }
 
@@ -106,6 +114,11 @@ function buildReportWhere(filters) {
     params.push(filters.lab_room);
   }
 
+  if (filters.pc_number) {
+    clauses.push("lp.pc_number = ?");
+    params.push(filters.pc_number);
+  }
+
   if (filters.date_from) {
     clauses.push("DATE(sr.time_in) >= DATE(?)");
     params.push(filters.date_from);
@@ -114,6 +127,16 @@ function buildReportWhere(filters) {
   if (filters.date_to) {
     clauses.push("DATE(sr.time_in) <= DATE(?)");
     params.push(filters.date_to);
+  }
+
+  if (filters.time_from) {
+    clauses.push("TIME(sr.time_in) >= TIME(?)");
+    params.push(filters.time_from);
+  }
+
+  if (filters.time_to) {
+    clauses.push("TIME(sr.time_in) <= TIME(?)");
+    params.push(filters.time_to);
   }
 
   return { whereClause: clauses.join(" AND "), params };
@@ -152,6 +175,27 @@ function getSafeReturnTo(value) {
   if (raw.startsWith("//")) return "";
   return raw;
 }
+
+router.get("/reservations", requireAdmin, async (req, res) => {
+  try {
+    const pendingReservations = await getAll(`
+      SELECT r.*, u.id_number, u.first_name, u.last_name
+      FROM reservations r
+      JOIN users u ON u.id = r.user_id
+      WHERE r.status = 'Pending'
+      ORDER BY r.reservation_time ASC
+    `);
+
+    res.render("admin/reservations", {
+      title: "Manage Reservations",
+      pendingReservations,
+    });
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to load reservations.";
+    res.redirect("/admin");
+  }
+});
 
 router.get("/", requireAdmin, async (req, res) => {
   try {
@@ -285,7 +329,7 @@ router.get("/", requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/announcements", requireAdmin, (req, res) => {
+router.post("/announcements", requireAdmin, async (req, res) => {
   const body = String(req.body.body || "").trim();
   const author = req.session.user?.name || "CCS Admin";
   const returnTo = String(req.body.returnTo || "/admin/announcements");
@@ -298,12 +342,22 @@ router.post("/announcements", requireAdmin, (req, res) => {
   db.run(
     `INSERT INTO announcements (author, body) VALUES (?, ?)`,
     [author, body],
-    function (err) {
+    async function (err) {
       if (err) {
         console.error(err);
         req.session.error = "Unable to post announcement.";
         return res.redirect(returnTo);
       }
+
+      const announcementId = this.lastID;
+
+      // Send notification to all non-admin users
+      try {
+        await notifyNewAnnouncementToAllUsers(author, announcementId);
+      } catch (notificationErr) {
+        console.error("Failed to send announcement notification:", notificationErr);
+      }
+
       req.session.message = "Announcement posted successfully.";
       res.redirect(returnTo);
     }
@@ -374,44 +428,131 @@ function statsPercent(value, total) {
   return Math.round((Number(value) / Number(total)) * 100);
 }
 
-router.post("/reservations/:id/approve", requireAdmin, (req, res) => {
-  db.run(
-    `UPDATE reservations SET status = 'Approved' WHERE id = ? AND status = 'Pending'`,
-    [req.params.id],
-    function (err) {
-      if (err) {
-        console.error(err);
-        req.session.error = "Unable to approve reservation.";
-        return res.redirect("/admin");
-      }
+router.post("/reservations/:id/approve", requireAdmin, async (req, res) => {
+  try {
+    // First get reservation details to send notification and update PC status
+    const reservation = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT user_id, lab_room, pc_number, reservation_time FROM reservations WHERE id = ? AND status = 'Pending'`,
+        [req.params.id],
+        (err, row) => {
+          if (err) return reject(err);
+          resolve(row);
+        }
+      );
+    });
 
-      req.session.message = this.changes
-        ? "Reservation approved successfully."
-        : "Reservation was already processed.";
-
-      res.redirect("/admin");
+    if (!reservation) {
+      req.session.message = "Reservation was already processed.";
+      return res.redirect("/admin/reservations");
     }
-  );
+
+    // Update reservation status
+    db.run(
+      `UPDATE reservations SET status = 'Approved' WHERE id = ? AND status = 'Pending'`,
+      [req.params.id],
+      async function (err) {
+        if (err) {
+          console.error(err);
+          req.session.error = "Unable to approve reservation.";
+          return res.redirect("/admin/reservations");
+        }
+
+        if (this.changes > 0) {
+          // Update PC status to reserved when reservation is approved
+          if (reservation.pc_number) {
+            db.run(
+              `UPDATE lab_pcs SET status = 'reserved' WHERE pc_number = ? AND lab_room = ?`,
+              [reservation.pc_number, reservation.lab_room],
+              (pcErr) => {
+                if (pcErr) console.error("Failed to update PC status:", pcErr);
+              }
+            );
+          }
+
+          // Send notification to user
+          try {
+            await notifyReservationApproved(
+              reservation.user_id,
+              req.params.id,
+              reservation.lab_room,
+              reservation.reservation_time
+            );
+          } catch (notificationErr) {
+            console.error("Failed to send approval notification:", notificationErr);
+          }
+        }
+
+        req.session.message = this.changes
+          ? "Reservation approved successfully."
+          : "Reservation was already processed.";
+
+        res.redirect("/admin/reservations");
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to approve reservation.";
+    res.redirect("/admin");
+  }
 });
 
-router.post("/reservations/:id/reject", requireAdmin, (req, res) => {
-  db.run(
-    `UPDATE reservations SET status = 'Rejected' WHERE id = ? AND status = 'Pending'`,
-    [req.params.id],
-    function (err) {
-      if (err) {
-        console.error(err);
-        req.session.error = "Unable to reject reservation.";
-        return res.redirect("/admin");
-      }
+router.post("/reservations/:id/reject", requireAdmin, async (req, res) => {
+  try {
+    // First get reservation details to send notification
+    const reservation = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT user_id, lab_room, reservation_time FROM reservations WHERE id = ? AND status = 'Pending'`,
+        [req.params.id],
+        (err, row) => {
+          if (err) return reject(err);
+          resolve(row);
+        }
+      );
+    });
 
-      req.session.message = this.changes
-        ? "Reservation rejected successfully."
-        : "Reservation was already processed.";
-
-      res.redirect("/admin");
+    if (!reservation) {
+      req.session.message = "Reservation was already processed.";
+      return res.redirect("/admin/reservations");
     }
-  );
+
+    // Update reservation status
+    db.run(
+      `UPDATE reservations SET status = 'Rejected' WHERE id = ? AND status = 'Pending'`,
+      [req.params.id],
+      async function (err) {
+        if (err) {
+          console.error(err);
+          req.session.error = "Unable to reject reservation.";
+          return res.redirect("/admin/reservations");
+        }
+
+        if (this.changes > 0) {
+          // Send notification to user
+          try {
+            await notifyReservationRejected(
+              reservation.user_id,
+              req.params.id,
+              reservation.lab_room,
+              reservation.reservation_time
+            );
+          } catch (notificationErr) {
+            console.error("Failed to send rejection notification:", notificationErr);
+          }
+        }
+
+        req.session.message = this.changes
+          ? "Reservation rejected successfully."
+          : "Reservation was already processed.";
+
+        res.redirect("/admin/reservations");
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to reject reservation.";
+    res.redirect("/admin");
+  }
 });
 
 router.post("/records/:id/timeout", requireAdmin, (req, res) => {
@@ -608,9 +749,11 @@ router.get("/student-sitin", requireAdmin, (req, res) => {
         sr.purpose,
         sr.lab_room,
         sr.time_in,
-        sr.status
+        sr.status,
+        lp.pc_number
       FROM sitin_records sr
       JOIN users u ON u.id = sr.user_id
+      LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
       WHERE sr.status = 'Active' AND u.role = 'student'
       ORDER BY sr.time_in DESC
       LIMIT ? OFFSET ?
@@ -861,6 +1004,102 @@ router.post("/student-sitin/time-out", requireAdmin, (req, res) => {
       );
     }
   );
+});
+
+// PC Management Routes
+router.get("/pc-management", requireAdmin, async (req, res) => {
+  try {
+    const selectedLab = req.query.lab || '524';
+    const labs = ['524', '526', '528', '530', '542', 'Mac'];
+    
+    const pcs = await getAll(
+      `SELECT pc_number, status FROM lab_pcs WHERE lab_room = ? ORDER BY pc_number`,
+      [selectedLab]
+    );
+
+    const statusCounts = await getAll(
+      `SELECT status, COUNT(*) as count FROM lab_pcs WHERE lab_room = ? GROUP BY status`,
+      [selectedLab]
+    );
+
+    res.render("admin/pc-management", {
+      title: "PC Management",
+      labs,
+      selectedLab,
+      pcs,
+      statusCounts,
+    });
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to load PC management.";
+    res.redirect("/admin");
+  }
+});
+
+router.post("/pc-management/update-status", requireAdmin, (req, res) => {
+  const { pc_number, lab_room, status } = req.body;
+  const returnTo = getSafeReturnTo(req.body.returnTo) || `/admin/pc-management?lab=${encodeURIComponent(lab_room)}`;
+
+  if (!pc_number || !lab_room || !status) {
+    req.session.error = "PC number, lab room, and status are required.";
+    return res.redirect(returnTo);
+  }
+
+  const validStatuses = ['available', 'reserved', 'not-available'];
+  if (!validStatuses.includes(status)) {
+    req.session.error = "Invalid status.";
+    return res.redirect(returnTo);
+  }
+
+  db.run(
+    `UPDATE lab_pcs SET status = ? WHERE pc_number = ? AND lab_room = ?`,
+    [status, pc_number, lab_room],
+    function (err) {
+      if (err) {
+        console.error(err);
+        req.session.error = "Unable to update PC status.";
+        return res.redirect(returnTo);
+      }
+
+      req.session.message = `PC-${pc_number} status updated to ${status}.`;
+      res.redirect(returnTo);
+    }
+  );
+});
+
+router.post("/pc-management/bulk-update", requireAdmin, (req, res) => {
+  const { lab_room, status, pc_numbers } = req.body;
+  const returnTo = getSafeReturnTo(req.body.returnTo) || `/admin/pc-management?lab=${encodeURIComponent(lab_room)}`;
+
+  if (!lab_room || !status || !pc_numbers) {
+    req.session.error = "Lab room, status, and PC numbers are required.";
+    return res.redirect(returnTo);
+  }
+
+  const pcs = pc_numbers.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+  
+  if (pcs.length === 0) {
+    req.session.error = "No valid PC numbers provided.";
+    return res.redirect(returnTo);
+  }
+
+  const validStatuses = ['available', 'reserved', 'not-available'];
+  if (!validStatuses.includes(status)) {
+    req.session.error = "Invalid status.";
+    return res.redirect(returnTo);
+  }
+
+  db.serialize(() => {
+    pcs.forEach(pcNum => {
+      db.run(
+        `UPDATE lab_pcs SET status = ? WHERE pc_number = ? AND lab_room = ?`,
+        [status, pcNum, lab_room]
+      );
+    });
+  });
+
+  req.session.message = `${pcs.length} PC(s) status updated to ${status}.`;
+  res.redirect(returnTo);
 });
 
 router.get("/students/:id/edit", requireAdmin, (req, res) => {
@@ -1152,9 +1391,11 @@ router.get("/reports", requireAdmin, (req, res) => {
       u.first_name,
       u.last_name,
       u.course,
-      u.course_level
+      u.course_level,
+      lp.pc_number
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
+    LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
     WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
     LIMIT 2000
@@ -1207,11 +1448,13 @@ router.get("/reports/export", requireAdmin, (req, res) => {
       COALESCE(u.course, '') AS course,
       COALESCE(u.course_level, '') AS year_level,
       sr.purpose,
+      lp.pc_number,
       sr.time_in,
       COALESCE(sr.time_out, '') AS time_out,
       DATE(sr.time_in) AS date
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
+    LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
     WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
   `;
@@ -1229,6 +1472,7 @@ router.get("/reports/export", requireAdmin, (req, res) => {
       "Course",
       "Year Level",
       "Purpose",
+      "PC",
       "Time In",
       "Time Out",
       "Date",
@@ -1243,6 +1487,7 @@ router.get("/reports/export", requireAdmin, (req, res) => {
           row.course,
           row.year_level,
           row.purpose,
+          row.pc_number || '',
           row.time_in,
           row.time_out,
           row.date,
@@ -1275,11 +1520,13 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
       COALESCE(u.course, '') AS course,
       COALESCE(u.course_level, '') AS year_level,
       sr.purpose,
+      lp.pc_number,
       sr.time_in,
       COALESCE(sr.time_out, '') AS time_out,
       DATE(sr.time_in) AS date
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
+    LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
     WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
   `;
@@ -1330,7 +1577,8 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
       { key: "student_name", label: "Student", width: 120 },
       { key: "course", label: "Course", width: 90 },
       { key: "year_level", label: "Year", width: 40 },
-      { key: "purpose", label: "Purpose", width: 240 },
+      { key: "purpose", label: "Purpose", width: 200 },
+      { key: "pc_number", label: "PC", width: 50 },
       { key: "time_in", label: "Time In", width: 80 },
       { key: "time_out", label: "Time Out", width: 80 },
       { key: "date", label: "Date", width: 60 },
