@@ -59,6 +59,7 @@ app.use('/', require('./routes/index'));
 app.use('/auth', require('./routes/auth'));
 app.use('/dashboard', require('./routes/dashboard'));
 app.use('/admin', require('./routes/admin'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 
 // ✅ PROTECTED IMAGE ROUTE (FIXED + SECURE)
