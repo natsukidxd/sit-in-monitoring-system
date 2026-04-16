@@ -84,6 +84,7 @@
               <th>Name</th>
               <th>Purpose</th>
               <th class="text-nowrap">Laboratory</th>
+              <th class="text-nowrap">PC</th>
               <th class="text-nowrap">Session</th>
               <th class="text-nowrap">Status</th>
               <th class="text-nowrap">Actions</th>
@@ -92,7 +93,7 @@
           <tbody>
             <% if (!results || !results.length) { %>
               <tr>
-                <td colspan="8" class="text-center py-4 text-muted">
+                <td colspan="9" class="text-center py-4 text-muted">
                   No active sit-in sessions found.
                 </td>
               </tr>
@@ -105,6 +106,7 @@
                 <td><%= row.first_name %> <%= row.last_name %></td>
                 <td><%= row.purpose %></td>
                 <td><%= row.lab_room %></td>
+                <td><%= row.pc_number || '-' %></td>
                 <td>
                   <% if (row.time_in) { %>
                     <%= new Date(row.time_in).toLocaleString() %>
