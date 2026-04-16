@@ -1,0 +1,66 @@
+<section class="py-3 py-lg-4">
+  <div class="container-fluid px-lg-3">
+    <div class="row g-3">
+      <div class="col-xl-12">
+        <div class="panel-card h-100">
+          <div class="panel-header">Pending Reservations</div>
+          <div class="panel-body table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>ID Number</th>
+                  <th>Name</th>
+                  <th>Lab</th>
+                  <th>PC</th>
+                  <th>Purpose</th>
+                  <th>Schedule</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!pendingReservations.length) { %>
+                <tr>
+                  <td colspan="7" class="text-center py-4 text-muted">
+                    No pending reservations.
+                  </td>
+                </tr>
+                <% } %>
+
+                <% pendingReservations.forEach(item => { %>
+                <tr>
+                  <td><%= item.id_number %></td>
+                  <td><%= item.first_name %> <%= item.last_name %></td>
+                  <td><%= item.lab_room %></td>
+                  <td><%= item.pc_number || '-' %></td>
+                  <td><%= item.purpose %></td>
+                  <td>
+                    <%= item.reservation_time ? new Date(item.reservation_time).toLocaleString() : '-' %>
+                  </td>
+                  <td class="d-flex gap-2">
+                    <form
+                      action="/admin/reservations/<%= item.id %>/approve"
+                      method="POST"
+                    >
+                      <button class="btn btn-sm btn-success" type="submit">
+                        Approve
+                      </button>
+                    </form>
+                    <form
+                      action="/admin/reservations/<%= item.id %>/reject"
+                      method="POST"
+                    >
+                      <button class="btn btn-sm btn-outline-danger" type="submit">
+                        Reject
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
