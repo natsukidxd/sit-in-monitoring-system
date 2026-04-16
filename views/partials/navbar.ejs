@@ -39,17 +39,32 @@
         <% } else { %>
         <li class="nav-item dropdown">
           <a
-            class="nav-link dropdown-toggle"
+            class="nav-link dropdown-toggle position-relative"
             href="#"
             role="button"
             data-bs-toggle="dropdown"
-            >Notification</a
+            aria-expanded="false"
+            id="notificationDropdown"
           >
-          <ul class="dropdown-menu dropdown-menu-end">
-            <li>
-              <span class="dropdown-item-text small text-secondary"
-                >No new notifications</span
-              >
+            <i class="bi bi-bell"></i>
+            <span
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              id="notificationBadge"
+              style="display: none; font-size: 0.6rem;"
+            >
+              0
+            </span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" style="min-width: 320px; max-width: 90vw;">
+            <li class="dropdown-header d-flex justify-content-between align-items-center">
+              <span>Notifications</span>
+              <button class="btn btn-sm btn-link p-0" id="markAllReadBtn" style="display: none;">Mark all read</button>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li id="notificationList">
+              <div class="text-center py-3">
+                <span class="text-muted small">Loading...</span>
+              </div>
             </li>
           </ul>
         </li>
@@ -90,9 +105,9 @@
         </li>
         <li class="nav-item">
           <a
-            class="nav-link <%= path === '/admin/feedback' ? 'active' : '' %>"
-            href="/admin/feedback"
-            >Feedback</a
+            class="nav-link <%= path === '/admin/reservations' ? 'active' : '' %>"
+            href="/admin/reservations"
+            >Reservation</a
           >
         </li>
         <li class="nav-item">
@@ -100,6 +115,13 @@
             class="nav-link <%= path === '/admin/announcements' ? 'active' : '' %>"
             href="/admin/announcements"
             >Announcements</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link <%= path === '/admin/pc-management' ? 'active' : '' %>"
+            href="/admin/pc-management"
+            >PC Management</a
           >
         </li>
         <% } else { %>
@@ -632,3 +654,216 @@
     })();
   </script>
 <% } %>
+
+<script>
+  (function () {
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const notificationBadge = document.getElementById('notificationBadge');
+    const notificationList = document.getElementById('notificationList');
+    const markAllReadBtn = document.getElementById('markAllReadBtn');
+
+    let notificationTimer = null;
+
+    function formatTimeAgo(dateString) {
+      const now = new Date();
+      const date = new Date(dateString);
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    async function fetchNotifications() {
+      try {
+        const response = await fetch('/api/notifications');
+        if (!response.ok) throw new Error('Failed to fetch notifications');
+        
+        const data = await response.json();
+        if (data.success) {
+          renderNotifications(data.notifications);
+        } else {
+          renderNotifications([]);
+        }
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+        renderNotifications([]);
+      }
+    }
+
+    async function fetchUnreadCount() {
+      try {
+        const response = await fetch('/api/notifications/unread-count');
+        if (!response.ok) throw new Error('Failed to fetch unread count');
+        
+        const data = await response.json();
+        if (data.success) {
+          updateBadge(data.count);
+        }
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    }
+
+    function updateBadge(count) {
+      if (count > 0) {
+        notificationBadge.textContent = count;
+        notificationBadge.style.display = 'inline-block';
+        markAllReadBtn.style.display = 'inline';
+      } else {
+        notificationBadge.style.display = 'none';
+        markAllReadBtn.style.display = 'none';
+      }
+    }
+
+    function renderNotifications(notifications) {
+      if (!notifications || notifications.length === 0) {
+        notificationList.innerHTML = `
+          <div class="text-center py-3">
+            <i class="bi bi-bell-slash text-muted" style="font-size: 2rem;"></i>
+            <p class="text-muted mt-2 mb-0">No notifications</p>
+          </div>
+        `;
+        return;
+      }
+
+      const hasUnread = notifications.some(n => !n.isRead);
+      
+      notificationList.innerHTML = notifications.map(notification => {
+        const isUnread = !notification.isRead;
+        const timeAgo = formatTimeAgo(notification.createdAt);
+        
+        return `
+          <div class="dropdown-item notification-item ${isUnread ? 'bg-light' : ''}" data-id="${notification.id}">
+            <div class="d-flex align-items-start gap-2">
+              <div class="flex-shrink-0">
+                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                  <i class="bi bi-${getTypeIcon(notification.type)} text-white"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start">
+                  <h6 class="mb-1 fw-semibold">${escapeHtml(notification.title)}</h6>
+                  <small class="text-muted">${timeAgo}</small>
+                </div>
+                <p class="mb-2 text-muted small">${escapeHtml(notification.message)}</p>
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="badge bg-secondary">${escapeHtml(notification.type.replace('_', ' '))}</span>
+                  ${isUnread ? `
+                    <button class="btn btn-sm btn-outline-primary mark-read-btn" data-id="${notification.id}">
+                      Mark as read
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+            ${!isUnread ? '<hr class="my-2">' : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getTypeIcon(type) {
+      switch (type) {
+        case 'reservation_approved': return 'check-circle-fill';
+        case 'reservation_rejected': return 'x-circle-fill';
+        case 'announcement': return 'megaphone-fill';
+        default: return 'bell-fill';
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, function (ch) {
+        if (ch === '&') return '&' + 'amp;';
+        if (ch === '<') return '&' + 'lt;';
+        if (ch === '>') return '&' + 'gt;';
+        if (ch === '"') return '&' + 'quot;';
+        if (ch === "'") return '&' + '#39;';
+        return ch;
+      });
+    }
+
+    async function markAsRead(notificationId) {
+      try {
+        const response = await fetch(`/api/notifications/${notificationId}/mark-read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          fetchNotifications();
+          fetchUnreadCount();
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+
+    async function markAllAsRead() {
+      try {
+        const response = await fetch('/api/notifications/mark-all-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          fetchNotifications();
+          fetchUnreadCount();
+        }
+      } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+      }
+    }
+
+    // Initial fetch and set up polling
+    if (notificationDropdown && notificationList) {
+      // Event listeners
+      notificationList.addEventListener('click', function(e) {
+        const markReadBtn = e.target.closest('.mark-read-btn');
+        if (markReadBtn) {
+          const notificationId = markReadBtn.getAttribute('data-id');
+          markAsRead(notificationId);
+        }
+      });
+
+      if (markAllReadBtn) {
+        markAllReadBtn.addEventListener('click', markAllAsRead);
+      }
+
+      // Fetch notifications when dropdown is opened
+      notificationDropdown.addEventListener('show.bs.dropdown', () => {
+        fetchNotifications();
+      });
+
+      fetchUnreadCount();
+      fetchNotifications();
+      
+      // Poll for new notifications every 30 seconds
+      notificationTimer = setInterval(() => {
+        fetchUnreadCount();
+      }, 30000);
+    } else {
+      // If notification elements don't exist, clear the loading message
+      if (notificationList) {
+        notificationList.innerHTML = `
+          <div class="text-center py-3">
+            <i class="bi bi-bell-slash text-muted" style="font-size: 2rem;"></i>
+            <p class="text-muted mt-2 mb-0">No notifications</p>
+          </div>
+        `;
+      }
+    }
+
+    // Clean up timer on page unload
+    window.addEventListener('beforeunload', () => {
+      if (notificationTimer) {
+        clearInterval(notificationTimer);
+      }
+    });
+  })();
+</script>
