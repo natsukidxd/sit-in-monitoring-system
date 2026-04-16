@@ -1,0 +1,187 @@
+<section class="py-4">
+  <div class="container-fluid">
+    <div class="row mb-4">
+      <div class="col-12">
+        <h2 class="fw-bold">PC Management</h2>
+        <p class="text-muted">Manage PC availability status for each laboratory</p>
+      </div>
+    </div>
+
+    <!-- Lab Selection -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Select Laboratory</label>
+        <select class="form-select" id="lab_selector" onchange="location.href='/admin/pc-management?lab=' + this.value">
+          <% labs.forEach(lab => { %>
+            <option value="<%= lab %>" <%= lab === selectedLab ? 'selected' : '' %>>Lab <%= lab %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <!-- Status Summary -->
+    <div class="row mb-4">
+      <div class="col-md-4">
+        <div class="card bg-success text-white">
+          <div class="card-body">
+            <h5 class="card-title">Available</h5>
+            <p class="card-text display-6"><%= statusCounts.find(s => s.status === 'available')?.count || 0 %></p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+          <div class="card-body">
+            <h5 class="card-title">Reserved</h5>
+            <p class="card-text display-6"><%= statusCounts.find(s => s.status === 'reserved')?.count || 0 %></p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-danger text-white">
+          <div class="card-body">
+            <h5 class="card-title">Not Available</h5>
+            <p class="card-text display-6"><%= statusCounts.find(s => s.status === 'not-available')?.count || 0 %></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PC Grid -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">PCs in Lab <%= selectedLab %></h5>
+        <div>
+          <span class="badge bg-success me-2">Available</span>
+          <span class="badge bg-warning text-dark me-2">Reserved</span>
+          <span class="badge bg-danger">Not Available</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="pc-grid-container">
+          <% for (let row = 0; row < 5; row++) { %>
+            <div class="pc-grid-row-wrapper">
+              <div class="pc-row-label">PC <%= row * 10 + 1 %> - <%= (row + 1) * 10 %></div>
+              <div class="pc-grid-row">
+                <% for (let col = 0; col < 10; col++) { 
+                  const pcIndex = row * 10 + col;
+                  const pc = pcs[pcIndex];
+                  if (pc) {
+                    const statusClass = pc.status === 'available' ? 'bg-success' : 
+                                       pc.status === 'reserved' ? 'bg-warning' : 'bg-danger';
+                %>
+                  <div class="pc-item-admin <%= statusClass %>" data-pc="<%= pc.pc_number %>" data-status="<%= pc.status %>">
+                    PC-<%= pc.pc_number %>
+                  </div>
+                <% } } %>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PC Status Change Modal -->
+<div class="modal fade" id="pcStatusModal" tabindex="-1" aria-labelledby="pcStatusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pcStatusModalLabel">Change PC Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/admin/pc-management/update-status" method="POST">
+        <div class="modal-body">
+          <input type="hidden" name="pc_number" id="modal_pc_number">
+          <input type="hidden" name="lab_room" value="<%= selectedLab %>">
+          
+          <p>Change status for <strong id="modal_pc_display"></strong>:</p>
+          
+          <div class="mb-3">
+            <label class="form-label">New Status</label>
+            <select name="status" class="form-select" required>
+              <option value="available">Available</option>
+              <option value="reserved">Reserved</option>
+              <option value="not-available">Not Available</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+  .pc-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pc-grid-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .pc-item-admin {
+    width: 80px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: white;
+  }
+
+  .pc-item-admin:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .pc-row-label {
+    text-align: center;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .pc-grid-row-wrapper {
+    margin-bottom: 12px;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const pcItems = document.querySelectorAll('.pc-item-admin');
+  const modal = document.getElementById('pcStatusModal');
+  const modalPcNumber = document.getElementById('modal_pc_number');
+  const modalPcDisplay = document.getElementById('modal_pc_display');
+  const statusSelect = modal.querySelector('select[name="status"]');
+
+  pcItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const pcNumber = this.dataset.pc;
+      const currentStatus = this.dataset.status;
+
+      modalPcNumber.value = pcNumber;
+      modalPcDisplay.textContent = `PC-${pcNumber}`;
+      statusSelect.value = currentStatus;
+
+      const bootstrapModal = new bootstrap.Modal(modal);
+      bootstrapModal.show();
+    });
+  });
+});
+</script>
