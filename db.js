@@ -79,6 +79,7 @@ function initializeDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         lab_room TEXT NOT NULL,
+        pc_number INTEGER,
         purpose TEXT NOT NULL,
         reservation_time DATETIME NOT NULL,
         status TEXT NOT NULL DEFAULT 'Pending',
@@ -86,6 +87,26 @@ function initializeDatabase() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `);
+
+    // Migration: Add pc_number column if it doesn't exist
+    db.all(`PRAGMA table_info(reservations)`, [], (err, columns) => {
+      if (err) {
+        console.error(err.message);
+        return;
+      }
+
+      const hasPcNumber = (columns || []).some(
+        (col) => col?.name === "pc_number"
+      );
+      if (!hasPcNumber) {
+        db.run(
+          `ALTER TABLE reservations ADD COLUMN pc_number INTEGER`,
+          (alterErr) => {
+            if (alterErr) console.error(alterErr.message);
+          }
+        );
+      }
+    });
 
     db.run(`
       CREATE TABLE IF NOT EXISTS announcements (
@@ -108,6 +129,42 @@ function initializeDatabase() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        reference_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS lab_pcs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pc_number INTEGER NOT NULL,
+        lab_room TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'available',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(pc_number, lab_room)
+      )
+    `);
+
+    // Initialize PCs for each lab (50 PCs per lab)
+    const labs = ['524', '526', '528', '530', '542', 'Mac'];
+    labs.forEach(lab => {
+      for (let i = 1; i <= 50; i++) {
+        db.run(
+          `INSERT OR IGNORE INTO lab_pcs (pc_number, lab_room, status) VALUES (?, ?, ?)`,
+          [i, lab, 'available']
+        );
+      }
+    });
 
     db.get(
       `SELECT id FROM users WHERE role = 'admin' LIMIT 1`,
