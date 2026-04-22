@@ -66,6 +66,7 @@ function initializeDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         lab_room TEXT NOT NULL,
+        pc_number INTEGER,
         purpose TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'Active',
         time_in DATETIME DEFAULT (DATETIME('now', 'localtime')),
@@ -73,6 +74,26 @@ function initializeDatabase() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `);
+
+    // Migration: Add pc_number column to sit-in records if it doesn't exist.
+    db.all(`PRAGMA table_info(sitin_records)`, [], (err, columns) => {
+      if (err) {
+        console.error(err.message);
+        return;
+      }
+
+      const hasPcNumber = (columns || []).some(
+        (col) => col?.name === "pc_number"
+      );
+      if (!hasPcNumber) {
+        db.run(
+          `ALTER TABLE sitin_records ADD COLUMN pc_number INTEGER`,
+          (alterErr) => {
+            if (alterErr) console.error(alterErr.message);
+          }
+        );
+      }
+    });
 
     db.run(`
       CREATE TABLE IF NOT EXISTS reservations (
