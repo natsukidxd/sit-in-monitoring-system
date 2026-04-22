@@ -398,7 +398,7 @@
 
             <div class="col-12 mt-3">
               <label class="form-label fw-semibold">Lab Room</label>
-              <select name="lab_room" class="form-select" required>
+              <select id="adminStudentSitInModalLabRoom" name="lab_room" class="form-select" required>
                 <option value="" disabled selected>Select laboratory</option>
                 <option value="524">524</option>
                 <option value="526">526</option>
@@ -407,6 +407,14 @@
                 <option value="542">542</option>
                 <option value="Mac">Mac</option>
               </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">PC Number</label>
+              <select id="adminStudentSitInModalPcNumber" name="pc_number" class="form-select" required disabled>
+                <option value="" selected disabled>Select lab first</option>
+              </select>
+              <div id="adminStudentSitInModalPcHelp" class="form-text">Choose a laboratory to load available PCs.</div>
             </div>
 
             <div class="col-12">
@@ -454,6 +462,9 @@
       var timeOutStudentId = document.getElementById("adminStudentSitInModalTimeOutStudentId");
       var timeInReturnTo = document.getElementById("adminStudentSitInModalTimeInReturnTo");
       var timeOutReturnTo = document.getElementById("adminStudentSitInModalTimeOutReturnTo");
+      var timeInLabRoom = document.getElementById("adminStudentSitInModalLabRoom");
+      var timeInPcNumber = document.getElementById("adminStudentSitInModalPcNumber");
+      var timeInPcHelp = document.getElementById("adminStudentSitInModalPcHelp");
 
       if (!navLink || !form || !input || !resultsEl) return;
 
@@ -464,6 +475,59 @@
 
       function setResultsHtml(html) {
         resultsEl.innerHTML = html;
+      }
+
+      function resetPcOptions(message) {
+        if (!timeInPcNumber) return;
+        timeInPcNumber.innerHTML = '<option value="" selected disabled>' + escapeHtml(message || "Select lab first") + "</option>";
+        timeInPcNumber.disabled = true;
+      }
+
+      function setPcOptions(pcs) {
+        if (!timeInPcNumber) return;
+        var options = ['<option value="" selected disabled>Select a PC</option>'];
+        pcs.forEach(function (pc) {
+          options.push('<option value="' + escapeHtml(pc) + '">PC-' + escapeHtml(pc) + "</option>");
+        });
+        timeInPcNumber.innerHTML = options.join("");
+        timeInPcNumber.disabled = pcs.length === 0;
+      }
+
+      async function loadAvailablePcs(labRoom) {
+        if (!timeInLabRoom || !timeInPcNumber) return;
+        if (!labRoom) {
+          resetPcOptions("Select lab first");
+          if (timeInPcHelp) timeInPcHelp.textContent = "Choose a laboratory to load available PCs.";
+          return;
+        }
+
+        resetPcOptions("Loading available PCs...");
+        if (timeInPcHelp) timeInPcHelp.textContent = "Fetching available PCs...";
+
+        try {
+          var response = await fetch(
+            "/admin/student-sitin/available-pcs?lab_room=" + encodeURIComponent(labRoom),
+            { headers: { Accept: "application/json" } }
+          );
+          if (!response.ok) {
+            throw new Error("Request failed");
+          }
+
+          var payload = await response.json();
+          var pcs = payload && Array.isArray(payload.pcs) ? payload.pcs : [];
+          if (!pcs.length) {
+            resetPcOptions("No available PCs");
+            if (timeInPcHelp) timeInPcHelp.textContent = "No available PCs found for this laboratory.";
+            return;
+          }
+
+          setPcOptions(pcs);
+          if (timeInPcHelp) timeInPcHelp.textContent = pcs.length + " PC(s) available in this laboratory.";
+        } catch (error) {
+          console.error(error);
+          resetPcOptions("Unable to load PCs");
+          if (timeInPcHelp) timeInPcHelp.textContent = "Could not load PCs. Please try again.";
+        }
       }
 
       function escapeHtml(value) {
@@ -587,6 +651,8 @@
         if (timeInForm && typeof timeInForm.reset === "function") {
           timeInForm.reset();
         }
+        resetPcOptions("Select lab first");
+        if (timeInPcHelp) timeInPcHelp.textContent = "Choose a laboratory to load available PCs.";
         if (timeInStudentId) timeInStudentId.value = studentId;
         if (timeOutStudentId) timeOutStudentId.value = studentId;
         if (timeInReturnTo) timeInReturnTo.value = returnTo;
@@ -612,6 +678,12 @@
         var sitInModal = window.bootstrap.Modal.getOrCreateInstance(sitInModalEl);
         sitInModal.show();
       });
+
+      if (timeInLabRoom) {
+        timeInLabRoom.addEventListener("change", function () {
+          loadAvailablePcs(String(timeInLabRoom.value || "").trim());
+        });
+      }
 
       form.addEventListener("submit", async function (e) {
         e.preventDefault();
