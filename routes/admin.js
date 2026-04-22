@@ -115,7 +115,7 @@ function buildReportWhere(filters) {
   }
 
   if (filters.pc_number) {
-    clauses.push("lp.pc_number = ?");
+    clauses.push("sr.pc_number = ?");
     params.push(filters.pc_number);
   }
 
@@ -556,25 +556,96 @@ router.post("/reservations/:id/reject", requireAdmin, async (req, res) => {
 });
 
 router.post("/records/:id/timeout", requireAdmin, (req, res) => {
-  db.run(
-    `
-      UPDATE sitin_records
-      SET status = 'Completed', time_out = DATETIME('now', 'localtime')
-      WHERE id = ? AND status = 'Active'
-    `,
+  db.get(
+    `SELECT id, user_id, lab_room, pc_number
+     FROM sitin_records
+     WHERE id = ? AND status = 'Active'
+     LIMIT 1`,
     [req.params.id],
-    function (err) {
-      if (err) {
-        console.error(err);
+    (recordErr, record) => {
+      if (recordErr) {
+        console.error(recordErr);
         req.session.error = "Unable to time out the sit-in record.";
         return res.redirect("/admin");
       }
 
-      req.session.message = this.changes
-        ? "Sit-in record timed out successfully."
-        : "No active sit-in record found.";
+      if (!record) {
+        req.session.message = "No active sit-in record found.";
+        return res.redirect("/admin");
+      }
 
-      res.redirect("/admin");
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        db.run(
+          `UPDATE sitin_records
+           SET status = 'Completed', time_out = DATETIME('now', 'localtime')
+           WHERE id = ? AND status = 'Active'`,
+          [record.id],
+          function (updateErr) {
+            if (updateErr) {
+              console.error(updateErr);
+              db.run("ROLLBACK");
+              req.session.error = "Unable to time out the sit-in record.";
+              return res.redirect("/admin");
+            }
+
+            if (!this.changes) {
+              db.run("ROLLBACK");
+              req.session.message = "No active sit-in record found.";
+              return res.redirect("/admin");
+            }
+
+            db.run(
+              `UPDATE users
+               SET sessions_left = MAX(COALESCE(sessions_left, 30) - 1, 0)
+               WHERE id = ? AND role = 'student'`,
+              [record.user_id],
+              (sessionErr) => {
+                if (sessionErr) {
+                  console.error(sessionErr);
+                  db.run("ROLLBACK");
+                  req.session.error = "Unable to update student session count.";
+                  return res.redirect("/admin");
+                }
+
+                const finalize = () => {
+                  db.run("COMMIT", (commitErr) => {
+                    if (commitErr) {
+                      console.error(commitErr);
+                      db.run("ROLLBACK");
+                      req.session.error = "Unable to finalize sit-in time-out.";
+                      return res.redirect("/admin");
+                    }
+
+                    req.session.message = "Sit-in record timed out successfully.";
+                    return res.redirect("/admin");
+                  });
+                };
+
+                if (!Number.isFinite(Number(record.pc_number))) {
+                  return finalize();
+                }
+
+                db.run(
+                  `UPDATE lab_pcs
+                   SET status = 'available'
+                   WHERE lab_room = ? AND pc_number = ? AND status = 'reserved'`,
+                  [record.lab_room, Number(record.pc_number)],
+                  (pcReleaseErr) => {
+                    if (pcReleaseErr) {
+                      console.error(pcReleaseErr);
+                      db.run("ROLLBACK");
+                      req.session.error = "Unable to release the assigned PC.";
+                      return res.redirect("/admin");
+                    }
+                    return finalize();
+                  }
+                );
+              }
+            );
+          }
+        );
+      });
     }
   );
 });
@@ -750,10 +821,9 @@ router.get("/student-sitin", requireAdmin, (req, res) => {
         sr.lab_room,
         sr.time_in,
         sr.status,
-        lp.pc_number
+        sr.pc_number
       FROM sitin_records sr
       JOIN users u ON u.id = sr.user_id
-      LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
       WHERE sr.status = 'Active' AND u.role = 'student'
       ORDER BY sr.time_in DESC
       LIMIT ? OFFSET ?
@@ -861,17 +931,45 @@ router.get("/student-sitin", requireAdmin, (req, res) => {
   }
 });
 
+router.get("/student-sitin/available-pcs", requireAdmin, (req, res) => {
+  const labRoom = String(req.query.lab_room || "").trim();
+  if (!labRoom) {
+    return res.status(400).json({ success: false, message: "lab_room is required." });
+  }
+
+  db.all(
+    `SELECT pc_number
+     FROM lab_pcs
+     WHERE lab_room = ? AND status = 'available'
+     ORDER BY pc_number ASC`,
+    [labRoom],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Unable to load PCs." });
+      }
+
+      return res.json({
+        success: true,
+        lab_room: labRoom,
+        pcs: (rows || []).map((row) => Number(row.pc_number)).filter((value) => Number.isFinite(value)),
+      });
+    }
+  );
+});
+
 router.post("/student-sitin/time-in", requireAdmin, (req, res) => {
-  const { student_id, lab_room, purpose } = req.body;
+  const { student_id, lab_room, purpose, pc_number } = req.body;
   const query = (req.body.query || "").trim();
   const sid = String(req.body.sid || "").trim();
   const defaultReturnTo = query
     ? `/admin/student-sitin?q=${encodeURIComponent(query)}${sid ? `&sid=${encodeURIComponent(sid)}` : ""}`
     : "/admin/student-sitin";
   const returnTo = getSafeReturnTo(req.body.returnTo) || defaultReturnTo;
+  const normalizedPc = Number(pc_number);
 
-  if (!student_id || !lab_room || !purpose) {
-    req.session.error = "Student, lab room, and purpose are required.";
+  if (!student_id || !lab_room || !purpose || !Number.isFinite(normalizedPc)) {
+    req.session.error = "Student, lab room, PC number, and purpose are required.";
     return res.redirect(returnTo);
   }
 
@@ -905,56 +1003,75 @@ router.post("/student-sitin/time-in", requireAdmin, (req, res) => {
             return res.redirect(returnTo);
           }
 
-          db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
+          db.get(
+            `SELECT id
+             FROM lab_pcs
+             WHERE lab_room = ? AND pc_number = ? AND status = 'available'
+             LIMIT 1`,
+            [lab_room, normalizedPc],
+            (pcErr, pcRow) => {
+              if (pcErr) {
+                console.error(pcErr);
+                req.session.error = "Unable to validate selected PC.";
+                return res.redirect(returnTo);
+              }
 
-            db.run(
-              `UPDATE users
-               SET sessions_left = sessions_left - 1
-               WHERE id = ? AND role = 'student' AND sessions_left > 0`,
-              [student_id],
-              function (decErr) {
-                if (decErr) {
-                  console.error(decErr);
-                  db.run("ROLLBACK");
-                  req.session.error = "Unable to decrement sessions.";
-                  return res.redirect(returnTo);
-                }
+              if (!pcRow) {
+                req.session.error = "Selected PC is not available for this lab.";
+                return res.redirect(returnTo);
+              }
 
-                if (!this.changes) {
-                  db.run("ROLLBACK");
-                  req.session.error = "This student has no sessions left.";
-                  return res.redirect(returnTo);
-                }
-
+              db.serialize(() => {
+                db.run("BEGIN TRANSACTION");
                 db.run(
-                  `INSERT INTO sitin_records (user_id, lab_room, purpose, time_in)
-                   VALUES (?, ?, ?, DATETIME('now', 'localtime'))`,
-                  [student_id, lab_room, purpose],
-                  function (insertErr) {
-                    if (insertErr) {
-                      console.error(insertErr);
+                  `UPDATE lab_pcs
+                   SET status = 'reserved'
+                   WHERE lab_room = ? AND pc_number = ? AND status = 'available'`,
+                  [lab_room, normalizedPc],
+                  function (reserveErr) {
+                    if (reserveErr) {
+                      console.error(reserveErr);
                       db.run("ROLLBACK");
-                      req.session.error = "Unable to record student time-in.";
+                      req.session.error = "Unable to reserve selected PC.";
                       return res.redirect(returnTo);
                     }
 
-                    db.run("COMMIT", (commitErr) => {
-                      if (commitErr) {
-                        console.error(commitErr);
-                        db.run("ROLLBACK");
-                        req.session.error = "Unable to finalize time-in.";
-                        return res.redirect(returnTo);
-                      }
+                    if (!this.changes) {
+                      db.run("ROLLBACK");
+                      req.session.error = "Selected PC is no longer available.";
+                      return res.redirect(returnTo);
+                    }
 
-                      req.session.message = `Time-in recorded for ${student.first_name} ${student.last_name}. Sessions left: ${sessionsLeft - 1}.`;
-                      res.redirect(returnTo);
-                    });
+                    db.run(
+                      `INSERT INTO sitin_records (user_id, lab_room, pc_number, purpose, time_in)
+                       VALUES (?, ?, ?, ?, DATETIME('now', 'localtime'))`,
+                      [student_id, lab_room, normalizedPc, purpose],
+                      function (insertErr) {
+                        if (insertErr) {
+                          console.error(insertErr);
+                          db.run("ROLLBACK");
+                          req.session.error = "Unable to record student time-in.";
+                          return res.redirect(returnTo);
+                        }
+
+                        db.run("COMMIT", (commitErr) => {
+                          if (commitErr) {
+                            console.error(commitErr);
+                            db.run("ROLLBACK");
+                            req.session.error = "Unable to finalize time-in.";
+                            return res.redirect(returnTo);
+                          }
+
+                          req.session.message = `Time-in recorded for ${student.first_name} ${student.last_name} on PC-${normalizedPc}. Session will be deducted after time-out.`;
+                          res.redirect(returnTo);
+                        });
+                      }
+                    );
                   }
                 );
-              }
-            );
-          });
+              });
+            }
+          );
         }
       );
     }
@@ -984,22 +1101,97 @@ router.post("/student-sitin/time-out", requireAdmin, (req, res) => {
         return res.redirect(returnTo);
       }
 
-      db.run(
-        `UPDATE sitin_records
-         SET status = 'Completed', time_out = DATETIME('now', 'localtime')
-         WHERE user_id = ? AND status = 'Active'`,
+      db.get(
+        `SELECT id, lab_room, pc_number
+         FROM sitin_records
+         WHERE user_id = ? AND status = 'Active'
+         ORDER BY time_in DESC
+         LIMIT 1`,
         [studentId],
-        function (err) {
-          if (err) {
-            console.error(err);
+        (activeErr, activeSession) => {
+          if (activeErr) {
+            console.error(activeErr);
             req.session.error = "Unable to time-out the student.";
             return res.redirect(returnTo);
           }
 
-          req.session.message = this.changes
-            ? `Timed out ${student.first_name} ${student.last_name} successfully.`
-            : "No active sit-in record found for this student.";
-          res.redirect(returnTo);
+          if (!activeSession) {
+            req.session.message = "No active sit-in record found for this student.";
+            return res.redirect(returnTo);
+          }
+
+          db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            db.run(
+              `UPDATE sitin_records
+               SET status = 'Completed', time_out = DATETIME('now', 'localtime')
+               WHERE id = ? AND status = 'Active'`,
+              [activeSession.id],
+              function (updateErr) {
+                if (updateErr) {
+                  console.error(updateErr);
+                  db.run("ROLLBACK");
+                  req.session.error = "Unable to time-out the student.";
+                  return res.redirect(returnTo);
+                }
+
+                if (!this.changes) {
+                  db.run("ROLLBACK");
+                  req.session.message = "No active sit-in record found for this student.";
+                  return res.redirect(returnTo);
+                }
+
+                const finish = () => {
+                  db.run("COMMIT", (commitErr) => {
+                    if (commitErr) {
+                      console.error(commitErr);
+                      db.run("ROLLBACK");
+                      req.session.error = "Unable to finalize time-out.";
+                      return res.redirect(returnTo);
+                    }
+
+                    req.session.message = `Timed out ${student.first_name} ${student.last_name} successfully.`;
+                    return res.redirect(returnTo);
+                  });
+                };
+
+                db.run(
+                  `UPDATE users
+                   SET sessions_left = MAX(COALESCE(sessions_left, 30) - 1, 0)
+                   WHERE id = ? AND role = 'student'`,
+                  [studentId],
+                  (sessionErr) => {
+                    if (sessionErr) {
+                      console.error(sessionErr);
+                      db.run("ROLLBACK");
+                      req.session.error = "Unable to update student session count.";
+                      return res.redirect(returnTo);
+                    }
+
+                    if (!Number.isFinite(Number(activeSession.pc_number))) {
+                      return finish();
+                    }
+
+                    db.run(
+                      `UPDATE lab_pcs
+                       SET status = 'available'
+                       WHERE lab_room = ? AND pc_number = ? AND status = 'reserved'`,
+                      [activeSession.lab_room, Number(activeSession.pc_number)],
+                      (pcReleaseErr) => {
+                        if (pcReleaseErr) {
+                          console.error(pcReleaseErr);
+                          db.run("ROLLBACK");
+                          req.session.error = "Unable to release the assigned PC.";
+                          return res.redirect(returnTo);
+                        }
+                        return finish();
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          });
         }
       );
     }
@@ -1392,10 +1584,9 @@ router.get("/reports", requireAdmin, (req, res) => {
       u.last_name,
       u.course,
       u.course_level,
-      lp.pc_number
+      sr.pc_number
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
-    LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
     WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
     LIMIT 2000
@@ -1448,13 +1639,12 @@ router.get("/reports/export", requireAdmin, (req, res) => {
       COALESCE(u.course, '') AS course,
       COALESCE(u.course_level, '') AS year_level,
       sr.purpose,
-      lp.pc_number,
+      sr.pc_number,
       sr.time_in,
       COALESCE(sr.time_out, '') AS time_out,
       DATE(sr.time_in) AS date
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
-    LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
     WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
   `;
@@ -1520,13 +1710,12 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
       COALESCE(u.course, '') AS course,
       COALESCE(u.course_level, '') AS year_level,
       sr.purpose,
-      lp.pc_number,
+      sr.pc_number,
       sr.time_in,
       COALESCE(sr.time_out, '') AS time_out,
       DATE(sr.time_in) AS date
     FROM sitin_records sr
     JOIN users u ON u.id = sr.user_id
-    LEFT JOIN lab_pcs lp ON lp.lab_room = sr.lab_room AND lp.status = 'reserved'
     WHERE ${completedWhereClause}
     ORDER BY sr.time_in DESC
   `;
