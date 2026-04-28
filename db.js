@@ -59,7 +59,34 @@ function initializeDatabase() {
           if (updateErr) console.error(updateErr.message);
         }
       );
+
+      // Add manual_points column for manual point adjustments
+      const hasManualPoints = (columns || []).some(
+        (col) => col?.name === "manual_points"
+      );
+      if (!hasManualPoints) {
+        db.run(
+          `ALTER TABLE users ADD COLUMN manual_points REAL DEFAULT 0`,
+          (alterErr) => {
+            if (alterErr) console.error(alterErr.message);
+          }
+        );
+      }
     });
+
+    // Create manual point adjustment audit log table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS manual_point_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        points_added REAL NOT NULL,
+        reason TEXT,
+        admin_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (admin_id) REFERENCES users(id)
+      )
+    `);
 
     db.run(`
       CREATE TABLE IF NOT EXISTS sitin_records (
@@ -235,6 +262,45 @@ function initializeDatabase() {
         );
       });
     });
+
+    // Software Management Tables
+    db.run(`
+      CREATE TABLE IF NOT EXISTS laboratories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS software (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS lab_software (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lab_id INTEGER NOT NULL,
+        software_id INTEGER NOT NULL,
+        FOREIGN KEY (lab_id) REFERENCES laboratories(id),
+        FOREIGN KEY (software_id) REFERENCES software(id),
+        UNIQUE(lab_id, software_id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS software_import_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL,
+        total_labs INTEGER DEFAULT 0,
+        total_software INTEGER DEFAULT 0,
+        imported_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (imported_by) REFERENCES users(id)
+      )
+    `);
+
   });
 }
 
