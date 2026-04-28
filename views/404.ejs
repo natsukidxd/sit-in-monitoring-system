@@ -3,7 +3,11 @@
     <div class="glass-card p-5">
       <h1 class="display-5 fw-bold">404</h1>
       <p class="text-secondary">The page you requested could not be found.</p>
-      <a href="/" class="btn btn-primary">Go Home</a>
+      <% if (currentUser && currentUser.role === 'admin') { %>
+        <a href="/admin" class="btn btn-primary">Go to Admin Dashboard</a>
+      <% } else { %>
+        <a href="/" class="btn btn-primary">Go Home</a>
+      <% } %>
     </div>
   </div>
 </section>
