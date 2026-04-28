@@ -1,66 +1,307 @@
 <section class="py-3 py-lg-4">
   <div class="container-fluid px-lg-3">
     <div class="row g-3">
-      <div class="col-xl-12">
-        <div class="panel-card h-100">
-          <div class="panel-header">Pending Reservations</div>
-          <div class="panel-body table-responsive">
-            <table class="table table-bordered align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>ID Number</th>
-                  <th>Name</th>
-                  <th>Lab</th>
-                  <th>PC</th>
-                  <th>Purpose</th>
-                  <th>Schedule</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (!pendingReservations.length) { %>
-                <tr>
-                  <td colspan="7" class="text-center py-4 text-muted">
-                    No pending reservations.
-                  </td>
-                </tr>
-                <% } %>
 
-                <% pendingReservations.forEach(item => { %>
-                <tr>
-                  <td><%= item.id_number %></td>
-                  <td><%= item.first_name %> <%= item.last_name %></td>
-                  <td><%= item.lab_room %></td>
-                  <td><%= item.pc_number || '-' %></td>
-                  <td><%= item.purpose %></td>
-                  <td>
-                    <%= item.reservation_time ? new Date(item.reservation_time).toLocaleString() : '-' %>
-                  </td>
-                  <td class="d-flex gap-2">
-                    <form
-                      action="/admin/reservations/<%= item.id %>/approve"
-                      method="POST"
-                    >
-                      <button class="btn btn-sm btn-success" type="submit">
-                        Approve
-                      </button>
-                    </form>
-                    <form
-                      action="/admin/reservations/<%= item.id %>/reject"
-                      method="POST"
-                    >
-                      <button class="btn btn-sm btn-outline-danger" type="submit">
-                        Reject
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-                <% }) %>
-              </tbody>
-            </table>
+      <!-- Column 1: Admin PC Control Panel -->
+      <div class="col-xl-4">
+        <div class="panel-card h-100">
+          <div class="panel-header">
+            <i class="bi bi-display me-2"></i>PC Control Panel
+          </div>
+          <div class="panel-body">
+            
+            <!-- Lab Selection -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Select Laboratory</label>
+              <select class="form-select" id="lab_selector" onchange="location.href='/admin/reservations?lab=' + this.value">
+                <option value="524" <%= selectedLab === '524' ? 'selected' : '' %>>Lab 524</option>
+                <option value="526" <%= selectedLab === '526' ? 'selected' : '' %>>Lab 526</option>
+                <option value="528" <%= selectedLab === '528' ? 'selected' : '' %>>Lab 528</option>
+                <option value="530" <%= selectedLab === '530' ? 'selected' : '' %>>Lab 530</option>
+                <option value="542" <%= selectedLab === '542' ? 'selected' : '' %>>Lab 542</option>
+                <option value="Mac" <%= selectedLab === 'Mac' ? 'selected' : '' %>>Mac Lab</option>
+              </select>
+            </div>
+
+            <!-- Status Summary -->
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <div class="card bg-success text-white text-center p-2">
+                  <div class="card-body p-2">
+                    <h6 class="mb-0">Available</h6>
+                    <h5 class="mb-0"><%= statusCounts.available %></h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="card bg-warning text-dark text-center p-2">
+                  <div class="card-body p-2">
+                    <h6 class="mb-0">Reserved</h6>
+                    <h5 class="mb-0"><%= statusCounts.reserved %></h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="card bg-danger text-white text-center p-2">
+                  <div class="card-body p-2">
+                    <h6 class="mb-0">Offline</h6>
+                    <h5 class="mb-0"><%= statusCounts['not-available'] %></h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PC Grid -->
+            <div class="pc-grid-container">
+              <% for (let row = 0; row < 5; row++) { %>
+                <div class="pc-grid-row mb-2">
+                  <% for (let col = 0; col < 10; col++) { 
+                    const pcIndex = row * 10 + col;
+                    const pc = pcs[pcIndex];
+                    if (pc) {
+                      const statusClass = pc.status === 'available' ? 'bg-success' : 
+                                         pc.status === 'reserved' ? 'bg-warning' : 'bg-danger';
+                  %>
+                    <div class="pc-item-admin <%= statusClass %>" data-pc="<%= pc.pc_number %>" data-status="<%= pc.status %>">
+                      PC-<%= pc.pc_number %>
+                    </div>
+                  <% } } %>
+                </div>
+              <% } %>
+            </div>
+
+            <div class="d-flex justify-content-center gap-3 mt-3">
+              <span class="badge bg-success">Available</span>
+              <span class="badge bg-warning text-dark">Reserved</span>
+              <span class="badge bg-danger">Offline</span>
+            </div>
+
           </div>
         </div>
       </div>
+
+      <!-- Column 2: Student Reservation List with Actions -->
+      <div class="col-xl-4">
+        <div class="panel-card h-100">
+          <div class="panel-header">
+            <i class="bi bi-list-check me-2"></i>Pending Reservations
+          </div>
+          <div class="panel-body" style="max-height: 75vh; overflow-y: auto;">
+            
+            <% if (!pendingReservations.length) { %>
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                No pending reservations.
+              </div>
+            <% } %>
+
+            <% pendingReservations.forEach(item => { %>
+              <div class="card mb-2 reservation-card">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      <h6 class="mb-0"><%= item.first_name %> <%= item.last_name %></h6>
+                      <small class="text-muted"><%= item.id_number %></small>
+                    </div>
+                    <span class="badge bg-primary"><%= item.lab_room %> / PC <%= item.pc_number || '-' %></span>
+                  </div>
+                  
+                  <p class="small mb-2"><%= item.purpose %></p>
+                  <p class="small text-muted mb-3">
+                    <i class="bi bi-clock me-1"></i>
+                    <%= item.reservation_time ? new Date(item.reservation_time).toLocaleString() : '-' %>
+                  </p>
+
+                  <div class="d-flex gap-2">
+                    <form action="/admin/reservations/<%= item.id %>/approve" method="POST" class="flex-grow-1">
+                      <button class="btn btn-sm btn-success w-100" type="submit">
+                        <i class="bi bi-check-lg me-1"></i>Approve
+                      </button>
+                    </form>
+                    <form action="/admin/reservations/<%= item.id %>/reject" method="POST" class="flex-grow-1">
+                      <button class="btn btn-sm btn-outline-danger w-100" type="submit">
+                        <i class="bi bi-x-lg me-1"></i>Reject
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Reservation Logs -->
+      <div class="col-xl-4">
+        <div class="panel-card h-100">
+          <div class="panel-header">
+            <i class="bi bi-clock-history me-2"></i>Reservation Logs
+          </div>
+          <div class="panel-body" style="max-height: 75vh; overflow-y: auto;">
+            
+            <div class="activity-log">
+              <% if (!reservationLogs.length) { %>
+                <div class="text-center py-4 text-muted">
+                  No reservation history yet.
+                </div>
+              <% } %>
+              
+              <% reservationLogs.forEach(log => { 
+                const statusColor = log.status === 'Approved' ? 'bg-success' : 'bg-danger';
+                const timeAgo = log.reservation_time ? new Date(log.reservation_time).toLocaleString() : '-';
+              %>
+                <div class="log-item">
+                  <div class="log-dot <%= statusColor %>"></div>
+                  <div class="log-content">
+                    <div class="log-text">Reservation #<%= log.id %> <%= log.status.toLowerCase() %> - <%= log.first_name %> <%= log.last_name %></div>
+                    <div class="log-time text-muted small"><%= timeAgo %></div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
+
+<style>
+.pc-grid-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.pc-item-admin {
+  width: 44px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.pc-item-admin:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.reservation-card {
+  transition: all 0.2s ease;
+  border-left: 3px solid #0d6efd;
+}
+
+.reservation-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.activity-log {
+  position: relative;
+}
+
+.activity-log::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #e9ecef;
+}
+
+.log-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.log-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+  position: relative;
+  z-index: 1;
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px #e9ecef;
+}
+
+.log-content {
+  flex-grow: 1;
+  padding-bottom: 4px;
+}
+
+.log-text {
+  font-size: 14px;
+  line-height: 1.4;
+}
+</style>
+
+<!-- PC Status Change Modal -->
+<div class="modal fade" id="pcStatusModal" tabindex="-1" aria-labelledby="pcStatusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pcStatusModalLabel">Change PC Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/admin/reservations/update-pc-status" method="POST">
+        <div class="modal-body">
+          <input type="hidden" name="pc_number" id="modal_pc_number">
+          <input type="hidden" name="lab_room" value="<%= selectedLab %>">
+          
+          <p>Change status for <strong id="modal_pc_display"></strong>:</p>
+          
+          <div class="mb-3">
+            <label class="form-label">New Status</label>
+            <select name="status" class="form-select" required>
+              <option value="available">Available</option>
+              <option value="reserved">Reserved</option>
+              <option value="not-available">Not Available</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const pcItems = document.querySelectorAll('.pc-item-admin');
+  const modal = document.getElementById('pcStatusModal');
+  const modalPcNumber = document.getElementById('modal_pc_number');
+  const modalPcDisplay = document.getElementById('modal_pc_display');
+  const statusSelect = modal.querySelector('select[name="status"]');
+
+  pcItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const pcNumber = this.dataset.pc;
+      const currentStatus = this.dataset.status;
+
+      modalPcNumber.value = pcNumber;
+      modalPcDisplay.textContent = `PC-${pcNumber}`;
+      statusSelect.value = currentStatus;
+
+      const bootstrapModal = new bootstrap.Modal(modal);
+      bootstrapModal.show();
+    });
+  });
+});
+</script>
