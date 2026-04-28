@@ -1,0 +1,235 @@
+<div class="container-fluid px-lg-4 py-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1 class="h3 fw-semibold mb-2">🏆 Student Leaderboard</h1>
+      <p class="text-muted mb-0">Ranking based on sit-in participation and performance</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="GET" action="/admin/leaderboard" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold small">Course</label>
+          <select name="course" class="form-select">
+            <option value="">All Courses</option>
+            <% courses.forEach(c => { %>
+              <option value="<%= c.course %>" <%= filters.course === c.course ? 'selected' : '' %>><%= c.course %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Year Level</label>
+          <select name="course_level" class="form-select">
+            <option value="">All Levels</option>
+            <% courseLevels.forEach(cl => { %>
+              <option value="<%= cl.course_level %>" <%= filters.course_level === cl.course_level ? 'selected' : '' %>>Year <%= cl.course_level %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold small">Date Range</label>
+          <select name="date_range" class="form-select">
+            <option value="all" <%= filters.date_range === 'all' ? 'selected' : '' %>>All Time</option>
+            <option value="weekly" <%= filters.date_range === 'weekly' ? 'selected' : '' %>>This Week</option>
+            <option value="monthly" <%= filters.date_range === 'monthly' ? 'selected' : '' %>>This Month</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-filter me-1"></i> Apply Filters
+          </button>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <a href="/admin/leaderboard" class="btn btn-outline-secondary w-100">
+            <i class="bi bi-x-circle me-1"></i> Reset
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Leaderboard Table -->
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 80px;" class="text-center">Rank</th>
+              <th>Student Name</th>
+              <th style="width: 120px;">Course</th>
+              <th style="width: 80px;" class="text-center">Year</th>
+              <th style="width: 100px;" class="text-center">Hours</th>
+              <th style="width: 100px;" class="text-center">Sessions</th>
+              <th style="width: 100px;" class="text-center">Points</th>
+              <th style="width: 120px;" class="text-center">Actions</th>
+              <th>Final Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% students.forEach(student => { %>
+              <% 
+                let rowClass = '';
+                let badgeClass = 'bg-secondary';
+                let rankIcon = '';
+                
+                if (student.rank === 1) {
+                  rowClass = 'table-warning bg-opacity-25';
+                  badgeClass = 'bg-warning text-dark';
+                  rankIcon = '🥇';
+                } else if (student.rank === 2) {
+                  rowClass = 'table-secondary bg-opacity-25';
+                  badgeClass = 'bg-secondary';
+                  rankIcon = '🥈';
+                } else if (student.rank === 3) {
+                  rowClass = 'table-danger bg-opacity-10';
+                  badgeClass = 'bg-danger';
+                  rankIcon = '🥉';
+                }
+              %>
+              <tr class="<%= rowClass %>">
+                <td class="text-center">
+                  <span class="badge <%= badgeClass %> fs-6">
+                    <%= rankIcon ? rankIcon : '#' + student.rank %>
+                  </span>
+                </td>
+                <td>
+                  <div class="fw-semibold">
+                    <%= student.first_name %> <%= student.middle_name ? student.middle_name.charAt(0) + '.' : '' %> <%= student.last_name %>
+                  </div>
+                  <div class="text-muted small"><%= student.id_number %></div>
+                </td>
+                <td><%= student.course || '-' %></td>
+                <td class="text-center"><%= student.course_level || '-' %></td>
+                <td class="text-center"><%= student.total_hours.toFixed(2) %></td>
+                <td class="text-center"><%= student.session_count %></td>
+                <td class="text-center">
+                  <%= student.points.toFixed(2) %>
+                  <% if (student.manual_points !== 0) { %>
+                    <span class="badge <%= student.manual_points > 0 ? 'bg-success' : 'bg-danger' %> ms-1">
+                      <%= student.manual_points > 0 ? '+' : '' %><%= student.manual_points.toFixed(1) %>
+                    </span>
+                  <% } %>
+                </td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#adjustPointsModal" data-user-id="<%= student.id %>" data-student-name="<%= student.first_name %> <%= student.last_name %>">
+                    <i class="bi bi-plus-minus"></i> Adjust
+                  </button>
+                </td>
+                <td style="width: 220px;">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="flex-grow-1">
+                      <div class="progress" style="height: 16px;">
+                        <div 
+                          class="progress-bar <%= student.rank <= 3 ? 'bg-success' : '' %>" 
+                          role="progressbar" 
+                          style="width: <%= Math.min(student.final_score, 100) %>%;"
+                          aria-valuenow="<%= student.final_score %>" 
+                          aria-valuemin="0" 
+                          aria-valuemax="100"
+                        >
+                        </div>
+                      </div>
+                    </div>
+                    <span class="fw-semibold small" style="width: 45px;"><%= student.final_score.toFixed(1) %></span>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+
+            <% if (students.length === 0) { %>
+              <tr>
+                <td colspan="9" class="text-center py-5 text-muted">
+                  <i class="bi bi-trophy fs-1 mb-3 d-block"></i>
+                  No student data available for the selected filters.
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Adjust Points Modal -->
+  <div class="modal fade" id="adjustPointsModal" tabindex="-1" aria-labelledby="adjustPointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="adjustPointsModalLabel">Adjust Student Points</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form method="POST" action="" id="adjustPointsForm">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Student</label>
+              <input type="text" class="form-control" id="modalStudentName" readonly>
+            </div>
+            <div class="mb-3">
+              <label for="pointsInput" class="form-label">Points Adjustment</label>
+              <input type="number" class="form-control" id="pointsInput" name="points" step="0.5" min="-100" max="100" required>
+              <div class="form-text">Enter positive value to add points, negative value to subtract points. Limit: ±100</div>
+            </div>
+            <div class="mb-3">
+              <label for="reasonInput" class="form-label">Reason (Optional)</label>
+              <textarea class="form-control" id="reasonInput" name="reason" rows="2" placeholder="Enter reason for this adjustment..."></textarea>
+            </div>
+            <input type="hidden" name="returnTo" value="<%= originalUrl %>">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Confirm Adjustment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const adjustModal = document.getElementById('adjustPointsModal');
+    adjustModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const userId = button.getAttribute('data-user-id');
+      const studentName = button.getAttribute('data-student-name');
+      
+      const form = document.getElementById('adjustPointsForm');
+      form.action = `/admin/users/${userId}/manual-points`;
+      
+      document.getElementById('modalStudentName').value = studentName;
+      document.getElementById('pointsInput').value = '';
+      document.getElementById('reasonInput').value = '';
+    });
+  });
+  </script>
+
+  <!-- Legend Card -->
+  <div class="card mt-4 shadow-sm">
+    <div class="card-body">
+      <h6 class="fw-semibold mb-3">📊 Scoring Formula</h6>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary">50%</span>
+            <span>Earned Points</span>
+          </div>
+          <div class="text-muted small mt-1">Points = Total Hours + (0.5 × Sessions) + Manual Adjustments</div>
+        </div>
+        <div class="col-md-4">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success">30%</span>
+            <span>Total Sit-in Hours</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info">20%</span>
+            <span>Sessions Completed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
