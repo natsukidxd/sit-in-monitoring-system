@@ -1,0 +1,74 @@
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <% if (success) { %>
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            Import Successful
+                        </h4>
+                    </div>
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-check-lg text-success" style="font-size: 4rem;"></i>
+                        
+                        <h5 class="mt-4 mb-4">Software import completed successfully</h5>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h3 class="mb-0 text-primary"><%= result.labs %></h3>
+                                        <small class="text-muted">Laboratories</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h3 class="mb-0 text-success"><%= result.software %></h3>
+                                        <small class="text-muted">Software Entries</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h3 class="mb-0 text-info"><%= result.uniqueSoftware %></h3>
+                                        <small class="text-muted">Unique Software</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-muted">
+                            File: <strong><%= filename %></strong>
+                        </p>
+                    </div>
+                <% } else { %>
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            Import Failed
+                        </h4>
+                    </div>
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-x-lg text-danger" style="font-size: 4rem;"></i>
+                        
+                        <h5 class="mt-4 mb-4">An error occurred during import</h5>
+                        
+                        <div class="alert alert-danger text-start">
+                            <strong>Error:</strong> <%= error %>
+                        </div>
+                    </div>
+                <% } %>
+                
+                <div class="card-footer text-center">
+                    <a href="/admin/software-import" class="btn btn-primary">
+                        <i class="bi bi-arrow-left me-2"></i>Return to Software Management
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
