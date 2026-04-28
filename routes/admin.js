@@ -1,13 +1,41 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
+const path = require("path");
 const { db } = require("../db");
 const { rules } = require("../dashboardContent");
 const PDFDocument = require("pdfkit");
+const SoftwareImport = require("../models/softwareImport");
 const {
   notifyReservationApproved,
   notifyReservationRejected,
   notifyNewAnnouncementToAllUsers,
 } = require("../models/notification");
+
+// Multer configuration for CSV uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../uploads"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'software-import-' + uniqueSuffix + '.csv');
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || path.extname(file.originalname).toLowerCase() === '.csv') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max
+  }
+});
 
 const router = express.Router();
 
@@ -178,23 +206,98 @@ function getSafeReturnTo(value) {
 
 router.get("/reservations", requireAdmin, async (req, res) => {
   try {
-    const pendingReservations = await getAll(`
-      SELECT r.*, u.id_number, u.first_name, u.last_name
-      FROM reservations r
-      JOIN users u ON u.id = r.user_id
-      WHERE r.status = 'Pending'
-      ORDER BY r.reservation_time ASC
-    `);
+    const selectedLab = req.query.lab || '524';
+    
+    const [pendingReservations, pcStatusCounts, pcs, reservationLogs] = await Promise.all([
+      getAll(`
+        SELECT r.*, u.id_number, u.first_name, u.last_name
+        FROM reservations r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.status = 'Pending'
+        ORDER BY r.reservation_time ASC
+      `),
+      
+      getAll(`
+        SELECT status, COUNT(*) as count 
+        FROM lab_pcs 
+        WHERE lab_room = ?
+        GROUP BY status
+      `, [selectedLab]),
+      
+      getAll(`
+        SELECT pc_number, status 
+        FROM lab_pcs 
+        WHERE lab_room = ?
+        ORDER BY pc_number ASC
+      `, [selectedLab]),
+      
+      getAll(`
+        SELECT 
+          r.id, 
+          r.status, 
+          u.first_name, 
+          u.last_name, 
+          r.reservation_time,
+          r.lab_room,
+          r.pc_number
+        FROM reservations r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.status IN ('Approved', 'Rejected')
+        ORDER BY r.reservation_time DESC
+        LIMIT 20
+      `)
+    ]);
+
+    const statusCounts = {
+      available: pcStatusCounts.find(s => s.status === 'available')?.count || 0,
+      reserved: pcStatusCounts.find(s => s.status === 'reserved')?.count || 0,
+      'not-available': pcStatusCounts.find(s => s.status === 'not-available')?.count || 0
+    };
 
     res.render("admin/reservations", {
       title: "Manage Reservations",
       pendingReservations,
+      statusCounts,
+      pcs,
+      selectedLab,
+      reservationLogs
     });
   } catch (error) {
     console.error(error);
     req.session.error = "Unable to load reservations.";
     res.redirect("/admin");
   }
+});
+
+router.post("/reservations/update-pc-status", requireAdmin, (req, res) => {
+  const { pc_number, lab_room, status } = req.body;
+  const returnTo = `/admin/reservations?lab=${encodeURIComponent(lab_room)}`;
+
+  if (!pc_number || !lab_room || !status) {
+    req.session.error = "PC number, lab room, and status are required.";
+    return res.redirect(returnTo);
+  }
+
+  const validStatuses = ['available', 'reserved', 'not-available'];
+  if (!validStatuses.includes(status)) {
+    req.session.error = "Invalid status.";
+    return res.redirect(returnTo);
+  }
+
+  db.run(
+    `UPDATE lab_pcs SET status = ? WHERE pc_number = ? AND lab_room = ?`,
+    [status, pc_number, lab_room],
+    function (err) {
+      if (err) {
+        console.error(err);
+        req.session.error = "Unable to update PC status.";
+        return res.redirect(returnTo);
+      }
+
+      req.session.message = `PC-${pc_number} status updated to ${status}.`;
+      res.redirect(returnTo);
+    }
+  );
 });
 
 router.get("/", requireAdmin, async (req, res) => {
@@ -931,6 +1034,167 @@ router.get("/student-sitin", requireAdmin, (req, res) => {
   }
 });
 
+router.get("/leaderboard", requireAdmin, async (req, res) => {
+  try {
+    // Get filter parameters
+    const course = String(req.query.course || "").trim();
+    const courseLevel = String(req.query.course_level || "").trim();
+    const dateRange = String(req.query.date_range || "all").trim();
+
+    // Build date filter
+    let dateCondition = "";
+    const dateParams = [];
+    
+    if (dateRange === "weekly") {
+      dateCondition = "AND DATE(sr.time_in) >= DATE('now', 'localtime', '-6 days')";
+    } else if (dateRange === "monthly") {
+      dateCondition = "AND DATE(sr.time_in) >= DATE('now', 'localtime', 'start of month')";
+    }
+
+    // Base query to get student sit-in statistics
+    let baseQuery = `
+      SELECT
+        u.id,
+        u.id_number,
+        u.first_name,
+        u.last_name,
+        u.middle_name,
+        u.course,
+        u.course_level,
+        COALESCE(u.manual_points, 0) AS manual_points,
+        COUNT(sr.id) AS session_count,
+        COALESCE(SUM((JULIANDAY(sr.time_out) - JULIANDAY(sr.time_in)) * 24), 0) AS total_hours
+      FROM users u
+      LEFT JOIN sitin_records sr 
+        ON sr.user_id = u.id 
+        AND sr.time_out IS NOT NULL
+        ${dateCondition}
+      WHERE u.role = 'student'
+    `;
+
+    const params = [...dateParams];
+
+    // Apply course filter
+    if (course) {
+      baseQuery += " AND u.course = ?";
+      params.push(course);
+    }
+
+    // Apply course level filter
+    if (courseLevel) {
+      baseQuery += " AND u.course_level = ?";
+      params.push(courseLevel);
+    }
+
+    baseQuery += " GROUP BY u.id ORDER BY u.last_name ASC";
+
+    const students = await getAll(baseQuery, params);
+
+     // Calculate points for each student
+     const studentData = students.map(student => {
+       const totalHours = Number(student.total_hours || 0);
+       const sessionCount = Number(student.session_count || 0);
+       const manualPoints = Number(student.manual_points ?? 0);
+       const computedPoints = totalHours + (sessionCount * 0.5);
+       const points = computedPoints + manualPoints;
+       
+       return {
+         ...student,
+         total_hours: totalHours,
+         session_count: sessionCount,
+         computed_points: computedPoints,
+         manual_points: manualPoints,
+         points
+       };
+    });
+
+    // Find max values for normalization
+    const maxPoints = Math.max(...studentData.map(s => s.points), 0);
+    const maxHours = Math.max(...studentData.map(s => s.total_hours), 0);
+    const maxTasks = Math.max(...studentData.map(s => s.session_count), 0);
+
+    // Normalize metrics and calculate final scores
+    const scoredStudents = studentData.map(student => {
+      // Normalize each metric to 0-100 scale
+      const pointsNorm = maxPoints > 0 ? (student.points / maxPoints) * 100 : 0;
+      const hoursNorm = maxHours > 0 ? (student.total_hours / maxHours) * 100 : 0;
+      const tasksNorm = maxTasks > 0 ? (student.session_count / maxTasks) * 100 : 0;
+
+      // Calculate final weighted score
+      const finalScore = (pointsNorm * 0.5) + (hoursNorm * 0.3) + (tasksNorm * 0.2);
+
+      return {
+        ...student,
+        points_norm: pointsNorm,
+        hours_norm: hoursNorm,
+        tasks_norm: tasksNorm,
+        final_score: finalScore
+      };
+    });
+
+    // Sort by final score descending
+    scoredStudents.sort((a, b) => b.final_score - a.final_score);
+
+    // Calculate ranks with proper tie handling
+    const rankedStudents = [];
+    let currentRank = 1;
+    let previousScore = null;
+    let sameRankCount = 0;
+
+    for (let i = 0; i < scoredStudents.length; i++) {
+      const student = scoredStudents[i];
+      
+      if (previousScore !== null && Math.abs(student.final_score - previousScore) > 0.0001) {
+        currentRank += sameRankCount;
+        sameRankCount = 1;
+      } else {
+        sameRankCount++;
+      }
+
+      rankedStudents.push({
+        ...student,
+        rank: currentRank
+      });
+
+      previousScore = student.final_score;
+    }
+
+    // Get available courses for filter dropdown
+    const courses = await getAll(`
+      SELECT DISTINCT course 
+      FROM users 
+      WHERE role = 'student' AND course IS NOT NULL AND course != ''
+      ORDER BY course ASC
+    `);
+
+    // Get available course levels
+    const courseLevels = await getAll(`
+      SELECT DISTINCT course_level 
+      FROM users 
+      WHERE role = 'student' AND course_level IS NOT NULL AND course_level != ''
+      ORDER BY course_level ASC
+    `);
+
+    res.render("admin/leaderboard", {
+      title: "Student Leaderboard",
+      students: rankedStudents,
+      filters: {
+        course,
+        course_level: courseLevel,
+        date_range: dateRange
+      },
+      courses,
+      courseLevels,
+      originalUrl: req.originalUrl
+    });
+
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to load leaderboard.";
+    res.redirect("/admin");
+  }
+});
+
 router.get("/student-sitin/available-pcs", requireAdmin, (req, res) => {
   const labRoom = String(req.query.lab_room || "").trim();
   if (!labRoom) {
@@ -1198,101 +1462,6 @@ router.post("/student-sitin/time-out", requireAdmin, (req, res) => {
   );
 });
 
-// PC Management Routes
-router.get("/pc-management", requireAdmin, async (req, res) => {
-  try {
-    const selectedLab = req.query.lab || '524';
-    const labs = ['524', '526', '528', '530', '542', 'Mac'];
-    
-    const pcs = await getAll(
-      `SELECT pc_number, status FROM lab_pcs WHERE lab_room = ? ORDER BY pc_number`,
-      [selectedLab]
-    );
-
-    const statusCounts = await getAll(
-      `SELECT status, COUNT(*) as count FROM lab_pcs WHERE lab_room = ? GROUP BY status`,
-      [selectedLab]
-    );
-
-    res.render("admin/pc-management", {
-      title: "PC Management",
-      labs,
-      selectedLab,
-      pcs,
-      statusCounts,
-    });
-  } catch (error) {
-    console.error(error);
-    req.session.error = "Unable to load PC management.";
-    res.redirect("/admin");
-  }
-});
-
-router.post("/pc-management/update-status", requireAdmin, (req, res) => {
-  const { pc_number, lab_room, status } = req.body;
-  const returnTo = getSafeReturnTo(req.body.returnTo) || `/admin/pc-management?lab=${encodeURIComponent(lab_room)}`;
-
-  if (!pc_number || !lab_room || !status) {
-    req.session.error = "PC number, lab room, and status are required.";
-    return res.redirect(returnTo);
-  }
-
-  const validStatuses = ['available', 'reserved', 'not-available'];
-  if (!validStatuses.includes(status)) {
-    req.session.error = "Invalid status.";
-    return res.redirect(returnTo);
-  }
-
-  db.run(
-    `UPDATE lab_pcs SET status = ? WHERE pc_number = ? AND lab_room = ?`,
-    [status, pc_number, lab_room],
-    function (err) {
-      if (err) {
-        console.error(err);
-        req.session.error = "Unable to update PC status.";
-        return res.redirect(returnTo);
-      }
-
-      req.session.message = `PC-${pc_number} status updated to ${status}.`;
-      res.redirect(returnTo);
-    }
-  );
-});
-
-router.post("/pc-management/bulk-update", requireAdmin, (req, res) => {
-  const { lab_room, status, pc_numbers } = req.body;
-  const returnTo = getSafeReturnTo(req.body.returnTo) || `/admin/pc-management?lab=${encodeURIComponent(lab_room)}`;
-
-  if (!lab_room || !status || !pc_numbers) {
-    req.session.error = "Lab room, status, and PC numbers are required.";
-    return res.redirect(returnTo);
-  }
-
-  const pcs = pc_numbers.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
-  
-  if (pcs.length === 0) {
-    req.session.error = "No valid PC numbers provided.";
-    return res.redirect(returnTo);
-  }
-
-  const validStatuses = ['available', 'reserved', 'not-available'];
-  if (!validStatuses.includes(status)) {
-    req.session.error = "Invalid status.";
-    return res.redirect(returnTo);
-  }
-
-  db.serialize(() => {
-    pcs.forEach(pcNum => {
-      db.run(
-        `UPDATE lab_pcs SET status = ? WHERE pc_number = ? AND lab_room = ?`,
-        [status, pcNum, lab_room]
-      );
-    });
-  });
-
-  req.session.message = `${pcs.length} PC(s) status updated to ${status}.`;
-  res.redirect(returnTo);
-});
 
 router.get("/students/:id/edit", requireAdmin, (req, res) => {
   db.get(
@@ -1471,6 +1640,78 @@ router.post("/students/reset-sessions", requireAdmin, (req, res) => {
       res.redirect("/admin/search");
     }
   );
+});
+
+// Manual Points Adjustment Endpoint
+router.post("/users/:id/manual-points", requireAdmin, (req, res) => {
+  const userId = req.params.id;
+  const points = Number(req.body.points);
+  const reason = String(req.body.reason || "").trim();
+  const adminId = req.session.user.id;
+  const returnTo = getSafeReturnTo(req.body.returnTo) || "/admin/leaderboard";
+
+  // Validate input
+  if (!Number.isFinite(points)) {
+    req.session.error = "Please enter a valid number for points.";
+    return res.redirect(returnTo);
+  }
+
+  // Enforce reasonable limits (-100 to +100 per adjustment)
+  if (points < -100 || points > 100) {
+    req.session.error = "Points adjustment must be between -100 and +100.";
+    return res.redirect(returnTo);
+  }
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    // Update user's manual points
+    db.run(
+      `UPDATE users SET manual_points = manual_points + ? WHERE id = ? AND role = 'student'`,
+      [points, userId],
+      function (updateErr) {
+        if (updateErr) {
+          console.error(updateErr);
+          db.run("ROLLBACK");
+          req.session.error = "Unable to adjust points.";
+          return res.redirect(returnTo);
+        }
+
+        if (this.changes === 0) {
+          db.run("ROLLBACK");
+          req.session.error = "Student not found.";
+          return res.redirect(returnTo);
+        }
+
+        // Log the adjustment
+        db.run(
+          `INSERT INTO manual_point_logs (user_id, points_added, reason, admin_id) VALUES (?, ?, ?, ?)`,
+          [userId, points, reason, adminId],
+          (logErr) => {
+            if (logErr) {
+              console.error(logErr);
+              db.run("ROLLBACK");
+              req.session.error = "Unable to log adjustment.";
+              return res.redirect(returnTo);
+            }
+
+            db.run("COMMIT", (commitErr) => {
+              if (commitErr) {
+                console.error(commitErr);
+                db.run("ROLLBACK");
+                req.session.error = "Unable to finalize point adjustment.";
+                return res.redirect(returnTo);
+              }
+
+              const operation = points >= 0 ? "added" : "deducted";
+              req.session.message = `Successfully ${operation} ${Math.abs(points)} points.`;
+              res.redirect(returnTo);
+            });
+          }
+        );
+      }
+    );
+  });
 });
 
 router.post("/students/add", requireAdmin, async(req, res) => {
@@ -1822,6 +2063,174 @@ router.get("/reports/export/pdf", requireAdmin, (req, res) => {
 
     doc.end();
   });
+});
+
+// ==============================================
+// SOFTWARE IMPORT MODULE
+// ==============================================
+
+/**
+ * Software Import Page
+ * GET /admin/software-import
+ */
+router.get("/software-import", requireAdmin, async (req, res) => {
+  try {
+    const history = await SoftwareImport.getImportHistory(20);
+    
+    res.render("admin/software-import/upload", {
+      title: "Software Management",
+      history,
+      message: req.session.message,
+      error: req.session.error
+    });
+    
+    delete req.session.message;
+    delete req.session.error;
+  } catch (error) {
+    console.error(error);
+    req.session.error = "Unable to load software import page.";
+    res.redirect("/admin");
+  }
+});
+
+/**
+ * Handle CSV File Upload
+ * POST /admin/software-import/upload
+ */
+router.post("/software-import/upload", requireAdmin, upload.single('csvFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      req.session.error = "Please select a CSV file to upload.";
+      return res.redirect("/admin/software-import");
+    }
+
+    // Parse CSV file
+    const parsedData = await SoftwareImport.parseCSV(req.file.path);
+    
+    if (parsedData.length === 0) {
+      SoftwareImport.cleanupTempFile(req.file.path);
+      req.session.error = "No valid software entries found in CSV file.";
+      return res.redirect("/admin/software-import");
+    }
+
+    // Store parsed data in session for preview
+    req.session.pendingSoftwareImport = {
+      data: parsedData,
+      filename: req.file.originalname,
+      tempPath: req.file.path
+    };
+
+    // Redirect to preview page
+    res.redirect("/admin/software-import/preview");
+
+  } catch (error) {
+    console.error("CSV upload error:", error);
+    if (req.file) {
+      SoftwareImport.cleanupTempFile(req.file.path);
+    }
+    req.session.error = "Failed to process CSV file: " + error.message;
+    res.redirect("/admin/software-import");
+  }
+});
+
+/**
+ * Preview Page
+ * GET /admin/software-import/preview
+ */
+router.get("/software-import/preview", requireAdmin, (req, res) => {
+  if (!req.session.pendingSoftwareImport) {
+    req.session.error = "No pending import found. Please upload a CSV file first.";
+    return res.redirect("/admin/software-import");
+  }
+
+  const { data, filename } = req.session.pendingSoftwareImport;
+  const grouped = SoftwareImport.groupByLab(data);
+  const labCount = Object.keys(grouped).length;
+  const totalSoftware = data.length;
+  const uniqueSoftware = new Set(data.map(i => i.software)).size;
+
+  res.render("admin/software-import/preview", {
+    title: "Preview Software Import",
+    grouped,
+    filename,
+    labCount,
+    totalSoftware,
+    uniqueSoftware
+  });
+});
+
+/**
+ * Confirm and Execute Import
+ * POST /admin/software-import/confirm
+ */
+router.post("/software-import/confirm", requireAdmin, async (req, res) => {
+  try {
+    if (!req.session.pendingSoftwareImport) {
+      req.session.error = "No pending import found.";
+      return res.redirect("/admin/software-import");
+    }
+
+    const { data, filename, tempPath } = req.session.pendingSoftwareImport;
+    
+    // Perform full import
+    const result = await SoftwareImport.performImport(
+      data, 
+      req.session.user.id, 
+      filename
+    );
+
+    // Cleanup
+    SoftwareImport.cleanupTempFile(tempPath);
+    delete req.session.pendingSoftwareImport;
+
+    res.render("admin/software-import/result", {
+      title: "Import Complete",
+      success: true,
+      result,
+      filename
+    });
+
+  } catch (error) {
+    console.error("Import error:", error);
+    res.render("admin/software-import/result", {
+      title: "Import Failed",
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Cancel Import
+ * POST /admin/software-import/cancel
+ */
+router.post("/software-import/cancel", requireAdmin, (req, res) => {
+  if (req.session.pendingSoftwareImport) {
+    SoftwareImport.cleanupTempFile(req.session.pendingSoftwareImport.tempPath);
+    delete req.session.pendingSoftwareImport;
+  }
+  
+  req.session.message = "Import cancelled.";
+  res.redirect("/admin/software-import");
+});
+
+/**
+ * Download CSV Template
+ * GET /admin/software-import/template
+ */
+router.get("/software-import/template", requireAdmin, (req, res) => {
+  // Standard labs used in the system
+  const standardLabs = ['524', '526', '528', '530', '542', 'Mac'];
+  
+  // Generate CSV header row with lab names
+  const csvHeader = standardLabs.join(',');
+  
+  // Set response headers for CSV download
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="software-import-template.csv"');
+  
+  // Send CSV content
+  res.send(csvHeader);
 });
 
 module.exports = router;
