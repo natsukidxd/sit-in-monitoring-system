@@ -29,13 +29,23 @@
         <div class="col-md-9">
           <select name="lab_room" id="lab_room_select" class="form-select" required>
             <option value="" selected disabled>Select laboratory</option>
-            <option value="524">524</option>
-            <option value="526">526</option>
-            <option value="528">528</option>
-            <option value="530">530</option>
-            <option value="542">542</option>
-            <option value="Mac">Mac</option>
+            <% labs.forEach(lab => { %>
+            <option value="<%= lab %>"><%= lab %></option>
+            <% }) %>
           </select>
+        </div>
+
+        <div class="col-md-3 align-self-center"><label class="form-label mb-0">Available Software:</label></div>
+        <div class="col-md-9">
+          <div class="form-control bg-light min-h-40 d-flex align-items-center">
+            <div id="software_loading" class="d-none text-muted">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              Loading software list...
+            </div>
+            <div id="software_container" class="w-100">
+              <small class="text-muted">Select a laboratory to view available software</small>
+            </div>
+          </div>
         </div>
 
         <div class="col-md-3"><label class="form-label">PC Number:</label></div>
@@ -227,6 +237,9 @@ document.addEventListener('DOMContentLoaded', function() {
   let selectedPC = null;
   let pcData = [];
 
+  const softwareContainer = document.getElementById('software_container');
+  const softwareLoading = document.getElementById('software_loading');
+
   // Enable PC selection button when lab is selected
   labSelect.addEventListener('change', function() {
     currentLab = this.value;
@@ -237,10 +250,52 @@ document.addEventListener('DOMContentLoaded', function() {
       pcDisplay.value = '';
       pcInput.value = '';
       submitBtn.disabled = true;
+      
+      // Load software for selected lab
+      loadSoftwareForLab(currentLab);
     } else {
       pcModalBtn.disabled = true;
+      softwareContainer.innerHTML = '<small class="text-muted">Select a laboratory to view available software</small>';
     }
   });
+  
+  // Load software for selected lab
+  function loadSoftwareForLab(lab) {
+    softwareLoading.classList.remove('d-none');
+    softwareContainer.innerHTML = '';
+
+    fetch(`/dashboard/api/lab-software/${encodeURIComponent(lab)}`)
+      .then(response => {
+        if (!response.ok) throw new Error('Lab not found');
+        return response.json();
+      })
+      .then(software => {
+        softwareLoading.classList.add('d-none');
+        
+        if (software.length === 0) {
+          softwareContainer.innerHTML = '<small class="text-muted">No software listed for this lab</small>';
+          return;
+        }
+        
+        // Display software as badges
+        const badgeContainer = document.createElement('div');
+        badgeContainer.className = 'd-flex flex-wrap gap-2';
+        
+        software.forEach(item => {
+          const badge = document.createElement('span');
+          badge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle';
+          badge.textContent = item.name;
+          badgeContainer.appendChild(badge);
+        });
+        
+        softwareContainer.appendChild(badgeContainer);
+      })
+      .catch(error => {
+        console.error('Error loading software:', error);
+        softwareLoading.classList.add('d-none');
+        softwareContainer.innerHTML = '<small class="text-danger">Failed to load software information</small>';
+      });
+  }
 
   // Open PC selection modal
   pcModalBtn.addEventListener('click', function() {
@@ -334,11 +389,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Form validation - prevent submission without PC selection
   document.querySelector('form').addEventListener('submit', function(e) {
-    if (!pcInput.value) {
-      e.preventDefault();
-      alert('Please select a PC for your reservation.');
-      return false;
+    // Only validate if this is actually the reservation form submit (not logout or other forms)
+    if (e.submitter && e.submitter.id === 'submit_reservation_btn') {
+      if (!pcInput.value) {
+        e.preventDefault();
+        // Use Bootstrap toast instead of native alert
+        showToast('Please select a PC for your reservation.', 'warning');
+        return false;
+      }
     }
   });
+  
+  // Toast notification helper
+  function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+      document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast element
+    const toastId = 'toast-' + Date.now();
+    const bgClass = type === 'warning' ? 'bg-warning text-dark' : 
+                    type === 'danger' ? 'bg-danger text-white' : 
+                    type === 'success' ? 'bg-success text-white' : 'bg-info text-white';
+    
+    toastContainer.innerHTML += `
+      <div id="${toastId}" class="toast align-items-center ${bgClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body">
+            ${message}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>
+    `;
+    
+    // Initialize and show toast
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 4000 });
+    toast.show();
+    
+    // Remove toast after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+      toastElement.remove();
+    });
+  }
 });
 </script>
