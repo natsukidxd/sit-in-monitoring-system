@@ -1,0 +1,91 @@
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="bi bi-eye me-2"></i>
+                        Preview Software Import
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0 text-primary"><%= labCount %></h3>
+                                    <small class="text-muted">Laboratories Detected</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0 text-success"><%= totalSoftware %></h3>
+                                    <small class="text-muted">Total Software Entries</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0 text-info"><%= uniqueSoftware %></h3>
+                                    <small class="text-muted">Unique Software</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <strong>File:</strong> <%= filename %>
+                        <br>
+                        <strong>Note:</strong> This will <u>replace all existing software data</u> with the entries below.
+                    </div>
+
+                    <h5 class="mb-3">Software by Laboratory</h5>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 20%">Laboratory</th>
+                                    <th>Software List</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% Object.keys(grouped).forEach(lab => { %>
+                                    <tr>
+                                        <td class="fw-bold"><%= lab %></td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <% grouped[lab].forEach(software => { %>
+                                                    <span class="badge bg-secondary"><%= software %></span>
+                                                <% }) %>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex gap-3 justify-content-end">
+                        <form action="/admin/software-import/cancel" method="POST">
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </button>
+                        </form>
+                        <form action="/admin/software-import/confirm" method="POST">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle me-2"></i>Confirm Import
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
