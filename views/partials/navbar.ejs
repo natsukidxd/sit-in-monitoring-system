@@ -110,21 +110,28 @@
             >Reservation</a
           >
         </li>
-        <li class="nav-item">
-          <a
-            class="nav-link <%= path === '/admin/announcements' ? 'active' : '' %>"
-            href="/admin/announcements"
-            >Announcements</a
-          >
-        </li>
-        <li class="nav-item">
-          <a
-            class="nav-link <%= path === '/admin/pc-management' ? 'active' : '' %>"
-            href="/admin/pc-management"
-            >PC Management</a
-          >
-        </li>
-        <% } else { %>
+         <li class="nav-item">
+           <a
+             class="nav-link <%= path === '/admin/announcements' ? 'active' : '' %>"
+             href="/admin/announcements"
+             >Announcements</a
+           >
+         </li>
+          <li class="nav-item">
+           <a
+             class="nav-link <%= path === '/admin/leaderboard' ? 'active' : '' %>"
+             href="/admin/leaderboard"
+             >Leaderboard</a
+           >
+         </li>
+         <li class="nav-item">
+           <a
+             class="nav-link <%= path === '/admin/software-import' ? 'active' : '' %>"
+             href="/admin/software-import"
+             >Software</a
+           >
+         </li>
+         <% } else { %>
         <li class="nav-item">
           <a
             class="nav-link <%= path === '/dashboard' ? 'active' : '' %>"
