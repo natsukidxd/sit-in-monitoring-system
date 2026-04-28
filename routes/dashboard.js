@@ -47,6 +47,20 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function requireStudent(req, res, next) {
+  if (!req.session.user) {
+    req.session.error = "Please log in first.";
+    return res.redirect("/auth/login");
+  }
+
+  if (req.session.user.role === "admin") {
+    req.session.error = "Admin accounts cannot access student dashboard sections.";
+    return res.redirect("/admin");
+  }
+
+  next();
+}
+
 function formatDateTime(date, time) {
   if (!date || !time) return null;
   return `${date} ${time}:00`;
@@ -142,13 +156,75 @@ function getAnnouncements(limit = 10) {
   });
 }
 
-router.get("/", requireAuth, async (req, res) => {
+function getSitinSummary(userId) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `
+        SELECT time_in, time_out
+        FROM sitin_records
+        WHERE user_id = ? AND status = 'Completed' AND time_out IS NOT NULL
+        ORDER BY time_in DESC
+      `,
+      [userId],
+      (err, rows) => {
+        if (err) return reject(err);
+        
+        const sessions = rows || [];
+        const totalSessions = sessions.length;
+        
+        let totalMinutes = 0;
+        let longestSession = 0;
+        const durations = [];
+        
+        sessions.forEach(session => {
+          const timeIn = new Date(session.time_in);
+          const timeOut = new Date(session.time_out);
+          const durationMs = timeOut - timeIn;
+          const durationMinutes = Math.round(durationMs / 60000);
+          
+          if (durationMinutes > 0) {
+            durations.push(durationMinutes);
+            totalMinutes += durationMinutes;
+            if (durationMinutes > longestSession) {
+              longestSession = durationMinutes;
+            }
+          }
+        });
+        
+        const totalHours = (totalMinutes / 60).toFixed(1);
+        const averageDuration = durations.length > 0 
+          ? Math.round(totalMinutes / durations.length) 
+          : 0;
+        
+        // Format durations for display
+        const formatDuration = (minutes) => {
+          if (minutes === 0) return "0 mins";
+          const h = Math.floor(minutes / 60);
+          const m = minutes % 60;
+          if (h === 0) return `${m} mins`;
+          if (m === 0) return `${h} hr`;
+          return `${h} hr ${m} mins`;
+        };
+        
+        resolve({
+          totalHours,
+          totalSessions,
+          averageDuration: formatDuration(averageDuration),
+          longestSession: formatDuration(longestSession)
+        });
+      }
+    );
+  });
+}
+
+router.get("/", requireStudent, async (req, res) => {
   const userId = req.session.user.id;
 
   try {
-    const [user, announcements] = await Promise.all([
+    const [user, announcements, sitinSummary] = await Promise.all([
       getUserById(userId),
       getAnnouncements(10),
+      getSitinSummary(userId),
     ]);
 
     if (user) refreshSessionUser(req, user);
@@ -159,6 +235,7 @@ router.get("/", requireAuth, async (req, res) => {
       announcements,
       rules,
       remainingSessions: Math.max(0, Number(user?.sessions_left ?? 30)),
+      sitinSummary,
     });
   } catch (error) {
     console.error(error);
@@ -167,7 +244,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/history", requireAuth, async (req, res) => {
+router.get("/history", requireStudent, async (req, res) => {
   try {
     const records = await getRecords(req.session.user.id);
     res.render("dashboard/history", {
@@ -181,11 +258,24 @@ router.get("/history", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/reservation", requireAuth, async (req, res) => {
+function getAvailableLabs() {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT DISTINCT lab_room FROM lab_pcs ORDER BY lab_room ASC`,
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows.map(row => row.lab_room));
+      }
+    );
+  });
+}
+
+router.get("/reservation", requireStudent, async (req, res) => {
   try {
-    const [user, reservations] = await Promise.all([
+    const [user, reservations, labs] = await Promise.all([
       getUserById(req.session.user.id),
       getReservations(req.session.user.id),
+      getAvailableLabs(),
     ]);
 
     if (user) refreshSessionUser(req, user);
@@ -194,6 +284,7 @@ router.get("/reservation", requireAuth, async (req, res) => {
       title: "Reservation",
       user,
       reservations,
+      labs,
       remainingSessions: Math.max(0, Number(user?.sessions_left ?? 30)),
     });
   } catch (error) {
@@ -203,7 +294,7 @@ router.get("/reservation", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/reservation", requireAuth, async (req, res) => {
+router.post("/reservation", requireStudent, async (req, res) => {
   const { lab_room, pc_number, purpose, reservation_date, reservation_time } = req.body;
   const reservationTime = formatDateTime(reservation_date, reservation_time);
 
@@ -247,7 +338,7 @@ router.post("/reservation", requireAuth, async (req, res) => {
   );
 });
 
-router.get("/profile", requireAuth, (req, res) => {
+router.get("/profile", requireStudent, (req, res) => {
   db.get(
     `SELECT id, id_number, first_name, last_name, middle_name, email, course, course_level, address, image_url
      FROM users
@@ -269,7 +360,7 @@ router.get("/profile", requireAuth, (req, res) => {
 
 router.post(
   "/profile",
-  requireAuth,
+  requireStudent,
   upload.single("profile_image"),
   (req, res) => {
     const {
@@ -334,7 +425,7 @@ router.post(
   },
 );
 
-router.post("/time-out/:id", requireAuth, (req, res) => {
+router.post("/time-out/:id", requireStudent, (req, res) => {
   const recordId = req.params.id;
   const userId = req.session.user.id;
   const returnTo = req.query.returnTo || "/dashboard/history";
@@ -353,7 +444,7 @@ router.post("/time-out/:id", requireAuth, (req, res) => {
   );
 });
 
-router.post("/feedback/:recordId", requireAuth, (req, res) => {
+router.post("/feedback/:recordId", requireStudent, (req, res) => {
   const recordId = req.params.recordId;
   const userId = req.session.user.id;
   const rating = Number.parseInt(String(req.body.rating || ""), 10);
@@ -414,7 +505,7 @@ router.post("/feedback/:recordId", requireAuth, (req, res) => {
 });
 
 // API endpoint to get PC status for a lab
-router.get("/api/lab-pcs", requireAuth, (req, res) => {
+router.get("/api/lab-pcs", requireStudent, (req, res) => {
   const lab = req.query.lab;
   
   if (!lab) {
@@ -428,6 +519,36 @@ router.get("/api/lab-pcs", requireAuth, (req, res) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ error: "Failed to fetch PC data" });
+      }
+      
+      res.json(rows || []);
+    }
+  );
+});
+
+// API endpoint to get software for a specific lab
+router.get("/api/lab-software/:labName", requireStudent, (req, res) => {
+  const labName = req.params.labName;
+  
+  if (!labName || typeof labName !== 'string') {
+    return res.status(400).json({ error: "Valid lab name is required" });
+  }
+
+  // Safe query with only existing columns
+  db.all(
+    `
+      SELECT DISTINCT s.name
+      FROM software s
+      INNER JOIN lab_software ls ON s.id = ls.software_id
+      INNER JOIN laboratories l ON ls.lab_id = l.id
+      WHERE UPPER(l.name) = UPPER(?)
+      ORDER BY s.name ASC
+    `,
+    [labName],
+    (err, rows) => {
+      if (err) {
+        console.log("Software query returned (normal if no software data):", err.message);
+        return res.json([]);
       }
       
       res.json(rows || []);
