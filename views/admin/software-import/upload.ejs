@@ -1,0 +1,93 @@
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-upload me-2"></i>
+                        Software Management - Import CSV
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <% if (message) { %>
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <i class="bi bi-check-circle me-2"></i><%= message %>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <% } %>
+                    
+                    <% if (error) { %>
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="bi bi-exclamation-triangle me-2"></i><%= error %>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <% } %>
+
+                    <div class="alert alert-info">
+                        <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>CSV Format Instructions:</h6>
+                        <ul class="mb-0">
+                            <li>Each <strong>column header</strong> = Laboratory name</li>
+                            <li>Each column contains software for that lab</li>
+                            <li>Empty cells are automatically ignored</li>
+                            <li>Duplicate software within same lab is automatically skipped</li>
+                        </ul>
+                    </div>
+
+                    <form action="/admin/software-import/upload" method="POST" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="csvFile" class="form-label">Select CSV File</label>
+                            <input type="file" class="form-control" id="csvFile" name="csvFile" accept=".csv" required>
+                            <div class="form-text">Maximum file size: 5MB</div>
+                        </div>
+
+                    <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-upload me-2"></i>Upload and Preview
+                            </button>
+                            <a href="/admin/software-import/template" class="btn btn-outline-secondary">
+                                <i class="bi bi-download me-2"></i>Download CSV Template
+                            </a>
+                        </div>
+                    </form>
+
+                    <hr>
+
+                    <h5 class="mb-3">
+                        <i class="bi bi-clock-history me-2"></i>
+                        Import History
+                    </h5>
+
+                    <% if (history && history.length > 0) { %>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Filename</th>
+                                        <th>Labs</th>
+                                        <th>Software</th>
+                                        <th>Imported By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% history.forEach(log => { %>
+                                        <tr>
+                                            <td><%= new Date(log.created_at).toLocaleString() %></td>
+                                            <td><%= log.filename %></td>
+                                            <td><span class="badge bg-secondary"><%= log.total_labs %></span></td>
+                                            <td><span class="badge bg-info"><%= log.total_software %></span></td>
+                                            <td><%= log.first_name %> <%= log.last_name %></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted text-center">No previous imports found.</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
