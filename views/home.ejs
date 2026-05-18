@@ -2,9 +2,46 @@
   <div class="container py-5">
     <div class="row align-items-center g-5">
       <div class="col-lg-5 text-center">
-        <div class="text-center mb-4">
-          <img src="/images/UC_LOGO.png" width="300" alt="UC Logo" />
-        </div>
+        <% if (topStudents && topStudents.length > 0) { %>
+          <div class="leaderboard-card p-3 p-lg-4">
+            <h3 class="fw-bold mb-3">
+              <i class="bi bi-trophy-fill text-warning"></i> Top Performers
+            </h3>
+            <% topStudents.forEach((student, index) => { 
+              const medals = ['🥇', '🥈', '🥉'];
+              const medalColors = ['#ffd700', '#c0c0c0', '#cd7f32'];
+              const rankColors = ['bg-warning text-dark', 'bg-secondary', 'bg-danger'];
+              const bgColors = ['rgba(255, 215, 0, 0.15)', 'rgba(192, 192, 192, 0.15)', 'rgba(205, 127, 50, 0.15)'];
+              const borderColors = ['rgba(255, 215, 0, 0.35)', 'rgba(192, 192, 192, 0.35)', 'rgba(205, 127, 50, 0.35)'];
+            %>
+              <div class="top-student-card mb-3 p-3 rounded-3" style="background: <%= bgColors[index] %>; border: 1px solid <%= borderColors[index] %>;">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rank-badge d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width: 48px; height: 48px; background: <%= medalColors[index] %>; font-size: 24px;">
+                    <%= medals[index] %>
+                  </div>
+                  <div class="text-start flex-grow-1">
+                    <h5 class="fw-bold mb-0 text-white"><%= student.first_name %> <%= student.last_name %></h5>
+                    <small class="text-light-emphasis"><%= student.course || 'N/A' %> • Year <%= student.course_level || 'N/A' %></small>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold text-white"><%= student.total_hours.toFixed(1) %>h</div>
+                    <small class="text-light-emphasis"><%= student.session_count %> sessions</small>
+                  </div>
+                </div>
+                <div class="progress mt-2" style="height: 6px; background: rgba(255,255,255,0.15);">
+                  <div class="progress-bar <%= rankColors[index] %>" role="progressbar" style="width: <%= Math.min(student.final_score, 100) %>%"></div>
+                </div>
+              </div>
+            <% }) %>
+            <p class="text-light-emphasis small mb-0 mt-2">
+              <i class="bi bi-info-circle"></i> Ranking based on sit-in hours, sessions, and points
+            </p>
+          </div>
+        <% } else { %>
+          <div class="text-center mb-4">
+            <img src="/images/UC_LOGO.png" width="300" alt="UC Logo" />
+          </div>
+        <% } %>
       </div>
       <div class="col-lg-7 ms-lg-auto">
         <div class="glass-card p-4 p-lg-5">
