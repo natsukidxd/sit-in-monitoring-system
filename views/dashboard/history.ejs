@@ -6,31 +6,39 @@
         <table class="table history-table align-middle mb-0">
           <thead>
             <tr>
-              <th>ID Number</th>
-              <th>Name</th>
-              <th>Sit Purpose</th>
-              <th>Laboratory</th>
-              <th>Login</th>
-              <th>Logout</th>
               <th>Date</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+              <th>Duration</th>
+              <th>PC No</th>
+              <th>Status</th>
+              <th>Lab</th>
+              <th>Purpose</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
             <% if (records.length === 0) { %>
               <tr>
-                <td colspan="8" class="text-center py-4">No history found.</td>
+                <td colspan="9" class="text-center py-4">No history found.</td>
               </tr>
             <% } %>
             <% records.forEach(record => { %>
               <tr>
-                <td><%= currentUser.id_number %></td>
-                <td><%= currentUser.first_name || currentUser.name.split(' ')[0] %> <%= currentUser.last_name || '' %></td>
-                <td><%= record.purpose %></td>
+                <td><%= record.date || '-' %></td>
+                <td><%= record.time_in ? record.time_in.split(' ')[1] || record.time_in : '-' %></td>
+                <td><%= record.time_out ? record.time_out.split(' ')[1] || record.time_out : '-' %></td>
+                <td><%= record.duration || '-' %></td>
+                <td><%= record.pc_number ? 'PC-' + record.pc_number : '-' %></td>
+                <td>
+                  <% if (record.status === 'Active') { %>
+                    <span class="badge text-bg-success">Active</span>
+                  <% } else { %>
+                    <span class="badge text-bg-secondary">Completed</span>
+                  <% } %>
+                </td>
                 <td><%= record.lab_room %></td>
-                <td><%= record.time_in || '-' %></td>
-                <td><%= record.time_out || '-' %></td>
-                <td><%= (record.time_in || '').split(' ')[0] || '-' %></td>
+                <td><%= record.purpose %></td>
                 <td>
                   <% if (record.status === 'Active') { %>
                     <form action="/dashboard/time-out/<%= record.id %>" method="POST">
@@ -61,7 +69,7 @@
                       <form action="/dashboard/feedback/<%= record.id %>" method="POST">
                         <div class="modal-body">
                           <div class="mb-2 small text-muted">
-                            Lab: <strong><%= record.lab_room %></strong> • Date: <strong><%= (record.time_in || '').split(' ')[0] || '-' %></strong>
+                            Lab: <strong><%= record.lab_room %></strong> • Date: <strong><%= record.date || '-' %></strong>
                           </div>
 
                           <div class="mb-3">
