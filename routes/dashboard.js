@@ -111,7 +111,45 @@ function getRecords(userId) {
       [userId],
       (err, rows) => {
         if (err) return reject(err);
-        resolve(rows || []);
+        
+        const records = (rows || []).map(record => {
+          // Extract date from time_in
+          let date = '-';
+          let timeIn = record.time_in;
+          let timeOut = record.time_out;
+          
+          if (record.time_in) {
+            const parts = record.time_in.split(' ');
+            date = parts[0] || '-';
+            timeIn = parts[1] || record.time_in;
+          }
+          
+          // Compute duration
+          let duration = '-';
+          if (record.time_in && record.time_out && record.status === 'Completed') {
+            const inDate = new Date(record.time_in);
+            const outDate = new Date(record.time_out);
+            const diffMs = outDate - inDate;
+            if (diffMs > 0) {
+              const diffMins = Math.round(diffMs / 60000);
+              const h = Math.floor(diffMins / 60);
+              const m = diffMins % 60;
+              if (h === 0) duration = `${m} mins`;
+              else if (m === 0) duration = `${h} hr`;
+              else duration = `${h} hr ${m} mins`;
+            }
+          }
+          
+          return {
+            ...record,
+            date,
+            timeIn,
+            timeOut,
+            duration
+          };
+        });
+        
+        resolve(records);
       },
     );
   });
