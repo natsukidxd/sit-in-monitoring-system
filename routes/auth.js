@@ -89,6 +89,11 @@ router.post("/register", async (req, res) => {
     return res.redirect("/auth/register");
   }
 
+  if (!['1', '2', '3', '4'].includes(String(course_level))) {
+    req.session.error = "Course level must be 1, 2, 3, or 4.";
+    return res.redirect("/auth/register");
+  }
+
   if (password !== confirm_password) {
     req.session.error = "Passwords do not match.";
     return res.redirect("/auth/register");

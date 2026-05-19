@@ -94,6 +94,10 @@ function getUserById(userId) {
   });
 }
 
+function isValidCourseLevel(value) {
+  return ['1', '2', '3', '4'].includes(String(value));
+}
+
 function escapeCsv(value) {
   if (value === null || value === undefined) return "";
   const stringValue = String(value);
@@ -1507,6 +1511,11 @@ router.post("/students/:id/edit", requireAdmin, (req, res) => {
     return res.redirect(`/admin/students/${req.params.id}/edit`);
   }
 
+  if (!isValidCourseLevel(course_level)) {
+    req.session.error = "Course level must be 1, 2, 3, or 4.";
+    return res.redirect(`/admin/students/${req.params.id}/edit`);
+  }
+
   const parsedSessionsLeft = Number.parseInt(String(sessions_left), 10);
   if (
     Number.isNaN(parsedSessionsLeft) ||
@@ -1737,6 +1746,11 @@ router.post("/students/add", requireAdmin, async(req, res) => {
     !course
   ) {
     req.session.error = "Please complete all required fields.";
+    return res.redirect("/admin/search");
+  }
+
+  if (!isValidCourseLevel(course_level)) {
+    req.session.error = "Course level must be 1, 2, 3, or 4.";
     return res.redirect("/admin/search");
   }
 

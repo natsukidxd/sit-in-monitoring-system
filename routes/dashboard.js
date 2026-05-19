@@ -411,6 +411,11 @@ router.post(
       address,
     } = req.body;
 
+    if (!['1', '2', '3', '4'].includes(String(course_level))) {
+      req.session.error = "Course level must be 1, 2, 3, or 4.";
+      return res.redirect("/dashboard/profile");
+    }
+
     db.get(
       "SELECT image_url FROM users WHERE id = ?",
       [req.session.user.id],
