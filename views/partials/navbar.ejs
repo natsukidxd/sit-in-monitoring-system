@@ -36,6 +36,11 @@
             >Register</a
           >
         </li>
+        <li class="nav-item ms-lg-2 d-flex align-items-center">
+          <button class="dark-mode-toggle" id="darkModeToggle" type="button" title="Toggle dark mode">
+            <i class="bi bi-moon-fill" id="darkModeIcon"></i>
+          </button>
+        </li>
         <% } else { %>
         <li class="nav-item dropdown">
           <a
@@ -161,6 +166,12 @@
           >
         </li>
         <% } %>
+
+        <li class="nav-item ms-lg-2 d-flex align-items-center">
+          <button class="dark-mode-toggle" id="darkModeToggle" type="button" title="Toggle dark mode">
+            <i class="bi bi-moon-fill" id="darkModeIcon"></i>
+          </button>
+        </li>
 
         <li class="nav-item ms-lg-2">
           <form action="/auth/logout" method="POST">

@@ -10,6 +10,17 @@
   <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    // 🔥 Prevent flash of wrong theme - runs before anything renders
+    (function() {
+      var theme = localStorage.getItem('sit-in-theme');
+      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+      } else {
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+      }
+    })();
+  </script>
 </head>
 
 <body>
@@ -42,8 +53,8 @@
         data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered" style="max-width: 720px; width: 90vw;">
           <div class="modal-content" style="border-radius: 18px; overflow: hidden;">
-            <div class="modal-header border-0"
-              style="background: linear-gradient(90deg, #124d99, #1e57a2); padding: 1.5rem 1.5rem 1rem;">
+            <div class="modal-header border-0 modal-header-ccs"
+              style="padding: 1.5rem 1.5rem 1rem;">
               <div class="d-flex align-items-center gap-3">
                 <i class="bi bi-check-circle-fill" style="font-size: 2.2rem; color: #ffffff;"></i>
                 <div>
@@ -84,6 +95,42 @@
       <% } %>
 
         <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+        <script>
+          (function() {
+            const toggleBtn = document.getElementById('darkModeToggle');
+            const icon = document.getElementById('darkModeIcon');
+            const html = document.documentElement;
+            const STORAGE_KEY = 'sit-in-theme';
+
+            function setTheme(theme) {
+              html.setAttribute('data-bs-theme', theme);
+              localStorage.setItem(STORAGE_KEY, theme);
+              if (icon) {
+                icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+              }
+            }
+
+            function toggleTheme() {
+              const current = html.getAttribute('data-bs-theme') || 'light';
+              setTheme(current === 'dark' ? 'light' : 'dark');
+            }
+
+            // Sync icon on page load (in case init already set it)
+            function syncIcon() {
+              if (icon) {
+                const current = html.getAttribute('data-bs-theme') || 'light';
+                icon.className = current === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+              }
+            }
+
+            if (toggleBtn) {
+              toggleBtn.addEventListener('click', toggleTheme);
+            }
+
+            syncIcon();
+          })();
+        </script>
 
         <% if (loginSuccess && message) { %>
           <script>
